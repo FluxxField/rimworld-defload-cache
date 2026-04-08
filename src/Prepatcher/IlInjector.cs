@@ -7,19 +7,18 @@ using Prepatcher;
 namespace FluxxField.DefLoadCache.Prepatcher
 {
     /// <summary>
-    /// Stage A: injects a single IL call to CacheHook.HookFired() at the top
-    /// of Verse.LoadedModManager.ApplyPatches.
+    /// Stage C: injects HookFired() at the start AND SaveToCache(xmlDoc, assetlookup)
+    /// before every ret in Verse.LoadedModManager.ApplyPatches. The save call
+    /// passes the method's two parameters via ldarg.0 and ldarg.1.
     ///
-    /// Runs during Prepatcher's assembly rewriting phase, BEFORE the CLR
-    /// verifies Assembly-CSharp.dll. At this point Assembly-CSharp is a
-    /// Mono.Cecil ModuleDefinition we can mutate freely.
+    /// Stage D will further extend this to wrap the HookFired call with a
+    /// TryLoadCached prefix that short-circuits the method body via brtrue.
     /// </summary>
     public static class IlInjector
     {
         [FreePatch]
         private static void InjectApplyPatchesHook(ModuleDefinition module)
         {
-            // Find Verse.LoadedModManager
             var loadedModManagerType = module.GetType("Verse.LoadedModManager");
             if (loadedModManagerType == null)
             {
@@ -27,7 +26,6 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 return;
             }
 
-            // Find ApplyPatches by name (matches the first method with that name)
             var applyPatchesMethod = loadedModManagerType.Methods
                 .FirstOrDefault(m => m.Name == "ApplyPatches");
             if (applyPatchesMethod == null)
@@ -36,31 +34,53 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 return;
             }
 
-            // Resolve the managed hook target via reflection on our own assembly
+            // Resolve managed hook targets via reflection
             MethodInfo? hookFiredMethod = typeof(CacheHook).GetMethod(
                 nameof(CacheHook.HookFired),
                 BindingFlags.Public | BindingFlags.Static);
-            if (hookFiredMethod == null)
+            MethodInfo? saveToCacheMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.SaveToCache),
+                BindingFlags.Public | BindingFlags.Static);
+            if (hookFiredMethod == null || saveToCacheMethod == null)
             {
-                System.Console.WriteLine("[DefLoadCache] FreePatch: CacheHook.HookFired not found via reflection");
+                System.Console.WriteLine("[DefLoadCache] FreePatch: required hook methods not found via reflection");
                 return;
             }
 
-            // Import the managed method reference into the target module
             MethodReference hookFiredRef = module.ImportReference(hookFiredMethod);
+            MethodReference saveToCacheRef = module.ImportReference(saveToCacheMethod);
 
-            // Inject `call CacheHook::HookFired()` at the very top of the method body
+            ILProcessor il = applyPatchesMethod.Body.GetILProcessor();
+
+            // Guard against empty method body
             if (applyPatchesMethod.Body.Instructions.Count == 0)
             {
                 System.Console.WriteLine("[DefLoadCache] FreePatch: ApplyPatches body is empty (abstract or unresolved?)");
                 return;
             }
-            ILProcessor ilProcessor = applyPatchesMethod.Body.GetILProcessor();
-            Instruction firstInstruction = applyPatchesMethod.Body.Instructions[0];
-            Instruction callInstruction = ilProcessor.Create(OpCodes.Call, hookFiredRef);
-            ilProcessor.InsertBefore(firstInstruction, callInstruction);
 
-            System.Console.WriteLine("[DefLoadCache] FreePatch: injected HookFired call into ApplyPatches");
+            // 1. Inject `call CacheHook::HookFired()` at the very top
+            Instruction firstInstruction = applyPatchesMethod.Body.Instructions[0];
+            Instruction callHookFired = il.Create(OpCodes.Call, hookFiredRef);
+            il.InsertBefore(firstInstruction, callHookFired);
+
+            // 2. Inject `ldarg.0; ldarg.1; call CacheHook::SaveToCache` before EVERY ret.
+            // Snapshot the ret positions FIRST so we don't iterate while mutating.
+            var retInstructions = applyPatchesMethod.Body.Instructions
+                .Where(i => i.OpCode == OpCodes.Ret)
+                .ToList();
+
+            foreach (var ret in retInstructions)
+            {
+                var ldArgDoc = il.Create(OpCodes.Ldarg_0);
+                var ldArgLookup = il.Create(OpCodes.Ldarg_1);
+                var callSave = il.Create(OpCodes.Call, saveToCacheRef);
+                il.InsertBefore(ret, ldArgDoc);
+                il.InsertBefore(ret, ldArgLookup);
+                il.InsertBefore(ret, callSave);
+            }
+
+            System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + {retInstructions.Count} SaveToCache call(s) into ApplyPatches");
         }
     }
 }
