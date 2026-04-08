@@ -7,12 +7,27 @@ using Prepatcher;
 namespace FluxxField.DefLoadCache.Prepatcher
 {
     /// <summary>
-    /// Stage C: injects HookFired() at the start AND SaveToCache(xmlDoc, assetlookup)
-    /// before every ret in Verse.LoadedModManager.ApplyPatches. The save call
-    /// passes the method's two parameters via ldarg.0 and ldarg.1.
+    /// Stages A+B+C+D IL injection into Verse.LoadedModManager.ApplyPatches.
     ///
-    /// Stage D will further extend this to wrap the HookFired call with a
-    /// TryLoadCached prefix that short-circuits the method body via brtrue.
+    /// Layout after injection:
+    ///
+    ///   call HookFired                    (A/B: fingerprint computation)
+    ///   ldarg.0                           (D: xmlDoc)
+    ///   ldarg.1                           (D: assetlookup)
+    ///   call TryLoadCached                (D: returns true on cache hit)
+    ///   brtrue ret                        (D: on hit, jump past everything to ret)
+    ///   &lt;original body&gt;                   (runs on cache miss)
+    ///   ldarg.0                           (C: xmlDoc for SaveToCache)
+    ///   ldarg.1                           (C: assetlookup for SaveToCache)
+    ///   call SaveToCache                  (C: serialize + write on miss)
+    ///   ret
+    ///
+    /// Cache-hit execution: HookFired → TryLoadCached → brtrue jumps directly
+    /// to ret, skipping original body AND SaveToCache.
+    ///
+    /// Cache-miss execution: HookFired → TryLoadCached returns false → fall
+    /// through to original body → leave.s branches from try/catch target
+    /// ldArgDoc (Stage C retargeting) → SaveToCache runs → ret.
     /// </summary>
     public static class IlInjector
     {
@@ -38,34 +53,39 @@ namespace FluxxField.DefLoadCache.Prepatcher
             MethodInfo? hookFiredMethod = typeof(CacheHook).GetMethod(
                 nameof(CacheHook.HookFired),
                 BindingFlags.Public | BindingFlags.Static);
+            MethodInfo? tryLoadCachedMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.TryLoadCached),
+                BindingFlags.Public | BindingFlags.Static);
             MethodInfo? saveToCacheMethod = typeof(CacheHook).GetMethod(
                 nameof(CacheHook.SaveToCache),
                 BindingFlags.Public | BindingFlags.Static);
-            if (hookFiredMethod == null || saveToCacheMethod == null)
+            if (hookFiredMethod == null || tryLoadCachedMethod == null || saveToCacheMethod == null)
             {
                 System.Console.WriteLine("[DefLoadCache] FreePatch: required hook methods not found via reflection");
                 return;
             }
 
             MethodReference hookFiredRef = module.ImportReference(hookFiredMethod);
+            MethodReference tryLoadCachedRef = module.ImportReference(tryLoadCachedMethod);
             MethodReference saveToCacheRef = module.ImportReference(saveToCacheMethod);
 
             ILProcessor il = applyPatchesMethod.Body.GetILProcessor();
 
-            // Guard against empty method body
             if (applyPatchesMethod.Body.Instructions.Count == 0)
             {
                 System.Console.WriteLine("[DefLoadCache] FreePatch: ApplyPatches body is empty (abstract or unresolved?)");
                 return;
             }
 
-            // 1. Inject `call CacheHook::HookFired()` at the very top
+            // Capture the original first instruction BEFORE any insertion
             Instruction firstInstruction = applyPatchesMethod.Body.Instructions[0];
+
+            // 1. Stage A: inject `call HookFired()` at the very top
             Instruction callHookFired = il.Create(OpCodes.Call, hookFiredRef);
             il.InsertBefore(firstInstruction, callHookFired);
 
-            // 2. Inject `ldarg.0; ldarg.1; call CacheHook::SaveToCache` before EVERY ret.
-            // Snapshot the ret positions FIRST so we don't iterate while mutating.
+            // 2. Stage C: inject SaveToCache postfix before every ret, with
+            //    full branch-retargeting and exception handler fixup.
             var retInstructions = applyPatchesMethod.Body.Instructions
                 .Where(i => i.OpCode == OpCodes.Ret)
                 .ToList();
@@ -76,15 +96,10 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 var ldArgLookup = il.Create(OpCodes.Ldarg_1);
                 var callSave = il.Create(OpCodes.Call, saveToCacheRef);
 
-                // CRITICAL: before inserting, re-point any branch whose operand
-                // is this ret to target our first injected instruction instead.
-                // Otherwise, leave.s/br instructions that previously landed on
-                // the ret will continue to target the ret directly, bypassing
-                // our inserted SaveToCache call and leaving it as dead code.
-                //
-                // In the ApplyPatches foreach-with-try/catch body, each catch
-                // block ends with `leave.s ret_target` — without this fixup,
-                // SaveToCache is never reached and no cache file is written.
+                // Retarget any branch (leave.s from catch blocks, etc.) that
+                // targeted this ret to instead target our first injected
+                // instruction. Otherwise those branches land directly on ret,
+                // bypassing our SaveToCache injection as dead code.
                 foreach (var inst in applyPatchesMethod.Body.Instructions)
                 {
                     if (inst.Operand == ret)
@@ -93,7 +108,7 @@ namespace FluxxField.DefLoadCache.Prepatcher
                     }
                 }
 
-                // Similarly for multi-target switch instructions.
+                // Also retarget multi-target switch Operand arrays
                 foreach (var inst in applyPatchesMethod.Body.Instructions)
                 {
                     if (inst.Operand is Instruction[] targets)
@@ -105,11 +120,9 @@ namespace FluxxField.DefLoadCache.Prepatcher
                     }
                 }
 
-                // Fix up exception handler boundaries. TryEnd/HandlerEnd are
-                // *exclusive* pointers — they point to the first instruction
-                // AFTER the protected region. Re-pointing them to ldArgDoc
-                // preserves the original extent so our SaveToCache call runs
-                // OUTSIDE the exception handler region.
+                // Fix exception handler boundaries. TryEnd/HandlerEnd are
+                // exclusive pointers; if they referenced ret, re-point to
+                // ldArgDoc so our postfix runs outside the protected region.
                 foreach (var handler in applyPatchesMethod.Body.ExceptionHandlers)
                 {
                     if (handler.TryStart == ret) handler.TryStart = ldArgDoc;
@@ -119,13 +132,37 @@ namespace FluxxField.DefLoadCache.Prepatcher
                     if (handler.FilterStart == ret) handler.FilterStart = ldArgDoc;
                 }
 
-                // Now safe to insert.
                 il.InsertBefore(ret, ldArgDoc);
                 il.InsertBefore(ret, ldArgLookup);
                 il.InsertBefore(ret, callSave);
             }
 
-            System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + {retInstructions.Count} SaveToCache call(s) into ApplyPatches");
+            // 3. Stage D: inject TryLoadCached prefix AFTER the Stage C
+            //    postfix work. Placement: between the HookFired call and the
+            //    original first instruction.
+            //
+            //    The brtrue operand targets the LAST ret directly (Cecil
+            //    preserves Instruction references, so even though we've
+            //    inserted instructions before ret in Stage C, brtrue's
+            //    operand is still ret — the branch lands past the whole
+            //    SaveToCache postfix).
+            //
+            //    This step MUST run AFTER the Stage C retargeting loop above.
+            //    If brtrue were inserted before that loop, the loop would
+            //    helpfully retarget its operand from ret to ldArgDoc, which
+            //    is the opposite of what we want.
+            Instruction brtrueTarget = retInstructions[retInstructions.Count - 1];
+            var ldArg0_D = il.Create(OpCodes.Ldarg_0);
+            var ldArg1_D = il.Create(OpCodes.Ldarg_1);
+            var callTryLoad = il.Create(OpCodes.Call, tryLoadCachedRef);
+            var brtrueCacheHit = il.Create(OpCodes.Brtrue, brtrueTarget);
+
+            il.InsertBefore(firstInstruction, ldArg0_D);
+            il.InsertBefore(firstInstruction, ldArg1_D);
+            il.InsertBefore(firstInstruction, callTryLoad);
+            il.InsertBefore(firstInstruction, brtrueCacheHit);
+
+            System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + TryLoadCached prefix + {retInstructions.Count} SaveToCache postfix(es) into ApplyPatches");
         }
     }
 }
