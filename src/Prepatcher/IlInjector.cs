@@ -78,6 +78,21 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 il.InsertBefore(ret, ldArgDoc);
                 il.InsertBefore(ret, ldArgLookup);
                 il.InsertBefore(ret, callSave);
+
+                // Fix up exception handler boundaries. In Cecil, ExceptionHandler
+                // TryEnd/HandlerEnd are *exclusive* pointers to the first
+                // instruction AFTER the protected region. If any handler's end
+                // pointer referenced the original ret, inserting instructions
+                // before the ret would implicitly enlarge the handler to cover
+                // our injected code. Re-pointing the end to our first injected
+                // instruction (ldArgDoc) preserves the original extent so our
+                // SaveToCache call runs OUTSIDE the exception handler region.
+                foreach (var handler in applyPatchesMethod.Body.ExceptionHandlers)
+                {
+                    if (handler.TryEnd == ret) handler.TryEnd = ldArgDoc;
+                    if (handler.HandlerEnd == ret) handler.HandlerEnd = ldArgDoc;
+                    if (handler.FilterStart == ret) handler.FilterStart = ldArgDoc;
+                }
             }
 
             System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + {retInstructions.Count} SaveToCache call(s) into ApplyPatches");

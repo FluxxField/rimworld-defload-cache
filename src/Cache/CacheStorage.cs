@@ -117,8 +117,16 @@ namespace FluxxField.DefLoadCache
                     try
                     {
                         File.Delete(fi.FullName);
-                        string metaPath = Path.ChangeExtension(fi.FullName, null) + ".meta.json";
-                        if (File.Exists(metaPath)) File.Delete(metaPath);
+                        // Derive the meta sidecar path from the fingerprint (the
+                        // filename stem before .xml.gz). Path.ChangeExtension only
+                        // strips ONE extension, which would leave ".xml.meta.json".
+                        string name = Path.GetFileName(fi.FullName);
+                        if (name.EndsWith(".xml.gz"))
+                        {
+                            string fingerprint = name.Substring(0, name.Length - ".xml.gz".Length);
+                            string metaPath = MetaPathForFingerprint(fingerprint);
+                            if (File.Exists(metaPath)) File.Delete(metaPath);
+                        }
                     }
                     catch { }
                 }

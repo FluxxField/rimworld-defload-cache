@@ -87,7 +87,6 @@ namespace FluxxField.DefLoadCache
                 var sw = Stopwatch.StartNew();
                 ModAttributionTagger.StampAttributions(xmlDoc, assetlookup);
                 byte[] bytes = CacheFormat.Serialize(xmlDoc);
-                sw.Stop();
 
                 string metaJson = "{"
                     + $"\"timestamp\":\"{DateTime.UtcNow:o}\","
@@ -98,7 +97,8 @@ namespace FluxxField.DefLoadCache
                     + "}";
 
                 CacheStorage.Write(_currentFingerprint, bytes, metaJson);
-                Log.Message($"SaveToCache: serialized + wrote in {sw.ElapsedMilliseconds}ms");
+                sw.Stop();
+                Log.Message($"SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
             }
             catch (Exception ex)
             {
