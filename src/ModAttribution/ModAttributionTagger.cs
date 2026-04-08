@@ -63,5 +63,64 @@ namespace FluxxField.DefLoadCache
 
             Log.Message($"ModAttributionTagger: stamped {stamped} nodes, {missing} had no mod attribution");
         }
+
+        /// <summary>
+        /// Rebuilds the assetlookup dictionary from the data-defloadcache-mod
+        /// attributes embedded on top-level def nodes during caching. Used by
+        /// TryLoadCached on cache hit to reproduce the mod-attribution state
+        /// that CombineIntoUnifiedXML would have built during a normal load.
+        ///
+        /// Reuses REAL LoadableXmlAsset instances from the original assetlookup
+        /// parameter (passed in BEFORE the doc is mutated). We can't construct
+        /// synthetic LoadableXmlAssets because its fields are readonly. So we
+        /// walk the existing lookup first to build a packageId → LoadableXmlAsset
+        /// map, then after the doc is replaced, look up each new node's
+        /// LoadableXmlAsset by its attribute.
+        ///
+        /// Returns the count of successfully-mapped nodes.
+        /// </summary>
+        public static int RebuildAssetLookup(XmlDocument doc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup, Dictionary<string, LoadableXmlAsset> packageIdToAsset)
+        {
+            if (doc?.DocumentElement == null) return 0;
+
+            int rebuilt = 0;
+            int stripped = 0;
+            int missingMod = 0;
+
+            foreach (XmlNode node in doc.DocumentElement.ChildNodes)
+            {
+                if (node.NodeType != XmlNodeType.Element) continue;
+                if (!(node is XmlElement element)) continue;
+
+                string packageId = element.GetAttribute(AttributeName);
+
+                // Strip our cache attribute so it doesn't pollute the live doc
+                // that ParseAndProcessXML will read. RimWorld's DirectXmlToObject
+                // generally ignores unknown attributes but removing ours is
+                // strictly safer.
+                if (!string.IsNullOrEmpty(packageId))
+                {
+                    element.RemoveAttribute(AttributeName);
+                    stripped++;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (packageIdToAsset.TryGetValue(packageId, out var asset))
+                {
+                    assetlookup[node] = asset;
+                    rebuilt++;
+                }
+                else
+                {
+                    missingMod++;
+                }
+            }
+
+            Log.Message($"ModAttributionTagger: stripped {stripped} cache attributes, rebuilt {rebuilt} assetlookup entries, {missingMod} packageIds not found in live load");
+            return rebuilt;
+        }
     }
 }
