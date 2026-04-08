@@ -21,13 +21,24 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public const int CacheFormatVersion = 1;
 
-        public static string Compute()
+        internal static string Compute()
         {
             var sb = new StringBuilder();
             sb.Append("rimworld=").Append(VersionControl.CurrentVersionString).Append('\n');
             sb.Append("cacheformat=").Append(CacheFormatVersion).Append('\n');
 
             var mods = LoadedModManager.RunningModsListForReading;
+            if (mods == null)
+            {
+                // Defensive: should never happen in normal RimWorld startup, but
+                // return a stable sentinel so HookFired's try/catch doesn't need
+                // to handle NRE from .Count below.
+                sb.Append("modcount=<null>\n");
+                using (var shaNull = SHA256.Create())
+                {
+                    return BytesToHex(shaNull.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString())));
+                }
+            }
             sb.Append("modcount=").Append(mods.Count).Append('\n');
 
             foreach (var mod in mods)
@@ -69,10 +80,14 @@ namespace FluxxField.DefLoadCache
             long totalBytes = 0;
             if (Directory.Exists(folderPath))
             {
-                foreach (var file in Directory.EnumerateFiles(folderPath, "*.xml", SearchOption.AllDirectories))
+                // Use DirectoryInfo.EnumerateFiles so .Length is populated from the
+                // same directory-listing syscall as the enumeration. Directory.EnumerateFiles
+                // would force a second stat() per file, doubling filesystem round-trips
+                // on NTFS-through-WSL.
+                foreach (var fi in new DirectoryInfo(folderPath).EnumerateFiles("*.xml", SearchOption.AllDirectories))
                 {
                     count++;
-                    try { totalBytes += new FileInfo(file).Length; }
+                    try { totalBytes += fi.Length; }
                     catch { /* unreadable file, skip its size */ }
                 }
             }
