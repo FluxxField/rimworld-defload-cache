@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- RimWorld game assemblies (HintPath to local Steam install) -->
+    <!-- RimWorld game assemblies -->
     <Reference Include="Assembly-CSharp">
       <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
@@ -24,13 +24,78 @@
       <Private>false</Private>
     </Reference>
 
-    <!-- Standalone Mono.Cecil NuGet — publicly-accessible Cecil types for typed IL injection.
-         ExcludeAssets="runtime" because at runtime RimWorld uses the Cecil bundled in
-         0Harmony.dll (shipped by Prepatcher). We only need this at compile time. -->
-    <PackageReference Include="Mono.Cecil" Version="0.11.5" ExcludeAssets="runtime" />
+    <!-- 0Harmony.dll from Prepatcher's workshop folder. This is the EXACT DLL
+         Prepatcher loads at runtime, so compile-time type identity matches
+         runtime. Bundled Mono.Cecil and MonoMod.Utils types live inside this
+         DLL as internal types; Krafs.Publicizer (below) publicizes them. -->
+    <Reference Include="0Harmony">
+      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
 
-    <!-- Prepatcher [FreePatch] attribute. ExcludeAssets="runtime" for the same reason. -->
-    <PackageReference Include="Zetrith.Prepatcher" Version="1.*" ExcludeAssets="runtime" />
+    <!-- Prepatcher's [FreePatch] attribute API -->
+    <Reference Include="0PrepatcherAPI">
+      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0PrepatcherAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Publicizer: rewrites 0Harmony.dll at compile time to make its internal
+         Mono.Cecil and MonoMod.Utils types publicly accessible. This is how
+         Performance Fish solves the same CS0122 problem. -->
+    <PackageReference Include="Krafs.Publicizer" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Publicize 0Harmony's internal types so we can use Mono.Cecil.ModuleDefinition
+         etc. directly from our FreePatch method. -->
+    <Publicize Include="0Harmony" IncludeVirtualMembers="false" />
+
+    <!-- DoNotPublicize: .NET base types bundled inside 0Harmony via ILRepack that
+         would collide with mscorlib/System.* if made public. Mirrors the
+         exclusion list from bbradson/Performance-Fish.
+         NOTE: Mono.Collections.Generic.Collection`1 is intentionally NOT excluded —
+         IlInjector needs Count and the indexer on Cecil's InstructionCollection,
+         which inherits from this type. It lives in the Mono.* namespace (not
+         System.*), so it doesn't collide with mscorlib types. -->
+    <DoNotPublicize Include="0Harmony:System.Memory`1" />
+    <DoNotPublicize Include="0Harmony:System.ReadOnlyMemory`1" />
+    <DoNotPublicize Include="0Harmony:System.Span`1" />
+    <DoNotPublicize Include="0Harmony:System.ReadOnlySpan`1" />
+    <DoNotPublicize Include="0Harmony:System.ThrowHelper" />
+    <DoNotPublicize Include="0Harmony:System.HashCode" />
+    <DoNotPublicize Include="0Harmony:System.StringExtensions" />
+    <DoNotPublicize Include="0Harmony:System.MemoryExtensions" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.DefaultInterpolatedStringHandler" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IgnoresAccessChecksToAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsByRefLikeAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsExternalInit" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsReadOnlyAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NativeIntegerAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullableAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullableContextAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullablePublicOnlyAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.RefSafetyRulesAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.ModuleInitializerAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.ITuple" />
+    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.Unsafe" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.AllowNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DisallowNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.ExtraDynamicallyAccessedMemberTypes" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MaybeNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute" />
+    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.UnscopedRefAttribute" />
   </ItemGroup>
 
 </Project>
