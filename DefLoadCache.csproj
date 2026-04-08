@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- RimWorld game assemblies (HintPath to local Steam install) -->
     <Reference Include="Assembly-CSharp">
       <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
@@ -22,14 +23,14 @@
       <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="0PrepatcherAPI">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0PrepatcherAPI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+
+    <!-- Standalone Mono.Cecil NuGet — publicly-accessible Cecil types for typed IL injection.
+         ExcludeAssets="runtime" because at runtime RimWorld uses the Cecil bundled in
+         0Harmony.dll (shipped by Prepatcher). We only need this at compile time. -->
+    <PackageReference Include="Mono.Cecil" Version="0.11.5" ExcludeAssets="runtime" />
+
+    <!-- Prepatcher [FreePatch] attribute. ExcludeAssets="runtime" for the same reason. -->
+    <PackageReference Include="Zetrith.Prepatcher" Version="1.*" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>
