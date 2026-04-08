@@ -1,7 +1,3 @@
-using System.Collections.Generic;
-using System.Xml;
-using Verse;
-
 namespace FluxxField.DefLoadCache
 {
     /// <summary>
@@ -15,6 +11,12 @@ namespace FluxxField.DefLoadCache
         /// <summary>
         /// Stage A plumbing proof. Called by injected IL at the top of
         /// Verse.LoadedModManager.ApplyPatches. Logs a single message and returns.
+        ///
+        /// IMPORTANT: IlInjector.InjectApplyPatchesHook resolves this method by
+        /// name via <c>nameof(CacheHook.HookFired)</c>. If you rename or remove
+        /// this method, update the injector in the same commit or the cache
+        /// plumbing breaks silently (the method-not-found path logs to
+        /// Console.WriteLine but doesn't crash).
         /// </summary>
         public static void HookFired()
         {

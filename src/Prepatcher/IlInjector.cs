@@ -50,6 +50,11 @@ namespace FluxxField.DefLoadCache.Prepatcher
             MethodReference hookFiredRef = module.ImportReference(hookFiredMethod);
 
             // Inject `call CacheHook::HookFired()` at the very top of the method body
+            if (applyPatchesMethod.Body.Instructions.Count == 0)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ApplyPatches body is empty (abstract or unresolved?)");
+                return;
+            }
             ILProcessor ilProcessor = applyPatchesMethod.Body.GetILProcessor();
             Instruction firstInstruction = applyPatchesMethod.Body.Instructions[0];
             Instruction callInstruction = ilProcessor.Create(OpCodes.Call, hookFiredRef);
