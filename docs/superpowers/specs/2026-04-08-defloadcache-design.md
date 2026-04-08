@@ -37,7 +37,7 @@ The only intervention point that runs early enough to short-circuit the loader i
 
 ### Mod identity
 
-- **Mod name:** DefLoadCache (working title)
+- **Mod name:** DefLoadCache
 - **packageId:** `fluxxfield.defloadcache`
 - **Author:** FluxxField
 - **Target RimWorld version:** 1.6 only
