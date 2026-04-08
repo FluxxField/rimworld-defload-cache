@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+Assemblies/*.dll
+Assemblies/*.pdb
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
