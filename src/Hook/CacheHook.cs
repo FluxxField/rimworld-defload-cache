@@ -1,16 +1,21 @@
+using System;
+using System.Diagnostics;
+
 namespace FluxxField.DefLoadCache
 {
     /// <summary>
     /// Static entry points called from IL injected by IlInjector.
-    /// Stage A: only HookFired() exists, called from the entry of ApplyPatches
-    /// to prove the plumbing works.
-    /// Later stages add TryLoadCached() and SaveToCache().
+    /// Stage B: HookFired now also computes and logs the modlist fingerprint
+    /// with Stopwatch timing so we can verify it's fast enough (&lt;5 sec).
+    /// Still no cache write/read.
     /// </summary>
     public static class CacheHook
     {
         /// <summary>
-        /// Stage A plumbing proof. Called by injected IL at the top of
-        /// Verse.LoadedModManager.ApplyPatches. Logs a single message and returns.
+        /// Called by injected IL at the top of
+        /// Verse.LoadedModManager.ApplyPatches. Logs the hook-fired message,
+        /// then computes and logs the modlist fingerprint with a Stopwatch
+        /// so we can verify it's fast.
         ///
         /// IMPORTANT: IlInjector.InjectApplyPatchesHook resolves this method by
         /// name via <c>nameof(CacheHook.HookFired)</c>. If you rename or remove
@@ -20,7 +25,20 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public static void HookFired()
         {
-            Log.Message("hook fired — Verse.LoadedModManager.ApplyPatches entered");
+            try
+            {
+                Log.Message("hook fired — Verse.LoadedModManager.ApplyPatches entered");
+
+                var sw = Stopwatch.StartNew();
+                string fingerprint = ModlistFingerprint.Compute();
+                sw.Stop();
+
+                Log.Message($"fingerprint = {fingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("HookFired threw — falling back to no-op", ex);
+            }
         }
     }
 }
