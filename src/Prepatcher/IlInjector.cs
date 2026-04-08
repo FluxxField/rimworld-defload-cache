@@ -75,24 +75,54 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 var ldArgDoc = il.Create(OpCodes.Ldarg_0);
                 var ldArgLookup = il.Create(OpCodes.Ldarg_1);
                 var callSave = il.Create(OpCodes.Call, saveToCacheRef);
-                il.InsertBefore(ret, ldArgDoc);
-                il.InsertBefore(ret, ldArgLookup);
-                il.InsertBefore(ret, callSave);
 
-                // Fix up exception handler boundaries. In Cecil, ExceptionHandler
-                // TryEnd/HandlerEnd are *exclusive* pointers to the first
-                // instruction AFTER the protected region. If any handler's end
-                // pointer referenced the original ret, inserting instructions
-                // before the ret would implicitly enlarge the handler to cover
-                // our injected code. Re-pointing the end to our first injected
-                // instruction (ldArgDoc) preserves the original extent so our
-                // SaveToCache call runs OUTSIDE the exception handler region.
+                // CRITICAL: before inserting, re-point any branch whose operand
+                // is this ret to target our first injected instruction instead.
+                // Otherwise, leave.s/br instructions that previously landed on
+                // the ret will continue to target the ret directly, bypassing
+                // our inserted SaveToCache call and leaving it as dead code.
+                //
+                // In the ApplyPatches foreach-with-try/catch body, each catch
+                // block ends with `leave.s ret_target` — without this fixup,
+                // SaveToCache is never reached and no cache file is written.
+                foreach (var inst in applyPatchesMethod.Body.Instructions)
+                {
+                    if (inst.Operand == ret)
+                    {
+                        inst.Operand = ldArgDoc;
+                    }
+                }
+
+                // Similarly for multi-target switch instructions.
+                foreach (var inst in applyPatchesMethod.Body.Instructions)
+                {
+                    if (inst.Operand is Instruction[] targets)
+                    {
+                        for (int i = 0; i < targets.Length; i++)
+                        {
+                            if (targets[i] == ret) targets[i] = ldArgDoc;
+                        }
+                    }
+                }
+
+                // Fix up exception handler boundaries. TryEnd/HandlerEnd are
+                // *exclusive* pointers — they point to the first instruction
+                // AFTER the protected region. Re-pointing them to ldArgDoc
+                // preserves the original extent so our SaveToCache call runs
+                // OUTSIDE the exception handler region.
                 foreach (var handler in applyPatchesMethod.Body.ExceptionHandlers)
                 {
+                    if (handler.TryStart == ret) handler.TryStart = ldArgDoc;
                     if (handler.TryEnd == ret) handler.TryEnd = ldArgDoc;
+                    if (handler.HandlerStart == ret) handler.HandlerStart = ldArgDoc;
                     if (handler.HandlerEnd == ret) handler.HandlerEnd = ldArgDoc;
                     if (handler.FilterStart == ret) handler.FilterStart = ldArgDoc;
                 }
+
+                // Now safe to insert.
+                il.InsertBefore(ret, ldArgDoc);
+                il.InsertBefore(ret, ldArgLookup);
+                il.InsertBefore(ret, callSave);
             }
 
             System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + {retInstructions.Count} SaveToCache call(s) into ApplyPatches");
