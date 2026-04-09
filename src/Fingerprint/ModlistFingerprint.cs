@@ -25,7 +25,7 @@ namespace FluxxField.DefLoadCache
         /// Bump this when the cache format changes. All caches with a different
         /// version are invalidated.
         /// </summary>
-        public const int CacheFormatVersion = 2;
+        public const int CacheFormatVersion = 3;
 
         internal static string Compute()
         {
@@ -148,16 +148,24 @@ namespace FluxxField.DefLoadCache
         {
             int count = 0;
             long totalBytes = 0;
+            long latestWriteTicks = 0;
             if (Directory.Exists(folderPath))
             {
                 foreach (var fi in new DirectoryInfo(folderPath).EnumerateFiles(searchPattern, SearchOption.AllDirectories))
                 {
                     count++;
-                    try { totalBytes += fi.Length; }
-                    catch { /* unreadable file, skip its size */ }
+                    try
+                    {
+                        totalBytes += fi.Length;
+                        long ticks = fi.LastWriteTimeUtc.Ticks;
+                        if (ticks > latestWriteTicks) latestWriteTicks = ticks;
+                    }
+                    catch { /* unreadable file, skip */ }
                 }
             }
-            sb.Append(label).Append("=count:").Append(count).Append(",bytes:").Append(totalBytes).Append('\n');
+            sb.Append(label).Append("=count:").Append(count)
+              .Append(",bytes:").Append(totalBytes)
+              .Append(",mtime:").Append(latestWriteTicks).Append('\n');
         }
 
         private static string BytesToHex(byte[] bytes)
