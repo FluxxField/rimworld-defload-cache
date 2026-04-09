@@ -52,6 +52,38 @@ namespace FluxxField.DefLoadCache
             }
         }
 
+        /// <summary>
+        /// Returns true if a cache file exists for this fingerprint.
+        /// </summary>
+        public static bool Exists(string fingerprint)
+        {
+            return File.Exists(PathForFingerprint(fingerprint));
+        }
+
+        /// <summary>
+        /// Opens the cache file as a streaming GZip-decompressing reader.
+        /// Caller is responsible for disposing the returned stream.
+        /// Returns null if the file doesn't exist or can't be opened.
+        /// </summary>
+        public static Stream? OpenReadStream(string fingerprint)
+        {
+            string p = PathForFingerprint(fingerprint);
+            if (!File.Exists(p)) return null;
+            try
+            {
+                var fs = new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    bufferSize: 65536);
+                return new System.IO.Compression.GZipStream(fs,
+                    System.IO.Compression.CompressionMode.Decompress);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"failed to open cache stream {p}", ex);
+                try { File.Delete(p); } catch { }
+                return null;
+            }
+        }
+
         public static void Write(string fingerprint, byte[] bytes, string metaJson)
         {
             try

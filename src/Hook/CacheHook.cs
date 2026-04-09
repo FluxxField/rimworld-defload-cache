@@ -26,6 +26,13 @@ namespace FluxxField.DefLoadCache
         internal static bool CacheHitOccurred;
 
         /// <summary>
+        /// Pipeline-wide stopwatch. Starts when HookFired enters (top of
+        /// ApplyPatches), reports cumulative elapsed at each subsequent stage.
+        /// Gives wall-clock timing for the entire def-loading pipeline.
+        /// </summary>
+        private static readonly Stopwatch _pipelineSw = new Stopwatch();
+
+        /// <summary>
         /// Called by injected IL at the top of ApplyPatches. Computes and
         /// stashes the fingerprint. TryLoadCached (Stage D) reads this stash
         /// to decide cache-hit vs miss without recomputing.
@@ -36,13 +43,14 @@ namespace FluxxField.DefLoadCache
         {
             try
             {
-                Log.Message("hook fired — Verse.LoadedModManager.ApplyPatches entered");
+                _pipelineSw.Restart();
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] hook fired — Verse.LoadedModManager.ApplyPatches entered");
 
                 var sw = Stopwatch.StartNew();
                 _currentFingerprint = ModlistFingerprint.Compute();
                 sw.Stop();
 
-                Log.Message($"fingerprint = {_currentFingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] fingerprint = {_currentFingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
             }
             catch (Exception ex)
             {
@@ -82,9 +90,9 @@ namespace FluxxField.DefLoadCache
                     return false;
                 }
 
-                if (!CacheStorage.TryRead(_currentFingerprint, out var bytes) || bytes == null)
+                if (!CacheStorage.Exists(_currentFingerprint))
                 {
-                    Log.Message("cache MISS — running normal ApplyPatches");
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache MISS — running normal ApplyPatches");
                     return false;
                 }
 
@@ -106,29 +114,31 @@ namespace FluxxField.DefLoadCache
                     }
                 }
 
-                // Deserialize the cached doc
-                XmlDocument cachedDoc = CacheFormat.Deserialize(bytes);
-
                 // === POINT OF NO RETURN ===
-                // After RemoveAll(), xmlDoc is mutated. If anything throws
-                // between here and return true, the caller's xmlDoc is in a
-                // partially-populated state. Returning false would let the
-                // original ApplyPatches body run on corrupted state. The
-                // catch block detects this via docMutated and rethrows.
-                docMutated = true;
-                xmlDoc.RemoveAll();
-                foreach (XmlNode child in cachedDoc.ChildNodes)
+                // xmlDoc.Load() replaces all content. If anything throws
+                // after this point, the caller's xmlDoc is in a corrupt
+                // state. Returning false would let the original ApplyPatches
+                // body run on garbage. The catch block detects this via
+                // docMutated and rethrows.
+                //
+                // Stream directly from file → gzip → xmlDoc.Load to avoid
+                // creating a second XmlDocument and deep-copying 45k+ nodes.
+                using (var stream = CacheStorage.OpenReadStream(_currentFingerprint))
                 {
-                    if (child.NodeType == XmlNodeType.XmlDeclaration) continue;
-                    XmlNode imported = xmlDoc.ImportNode(child, deep: true);
-                    xmlDoc.AppendChild(imported);
+                    if (stream == null)
+                    {
+                        Log.Warning("TryLoadCached: cache file vanished between Exists and OpenReadStream");
+                        return false;
+                    }
+                    docMutated = true;
+                    xmlDoc.Load(stream);
                 }
 
                 assetlookup.Clear();
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset);
 
                 sw.Stop();
-                Log.Message($"cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
 
                 CacheHitOccurred = true;
                 return true;
@@ -157,7 +167,8 @@ namespace FluxxField.DefLoadCache
         {
             if (CacheHitOccurred)
             {
-                Log.Message("ClearCachedPatches skipped — cache hit, patches were never executed");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] ClearCachedPatches skipped — cache hit, patches were never executed");
+                _pipelineSw.Stop();
                 return true;
             }
             return false;
@@ -214,7 +225,8 @@ namespace FluxxField.DefLoadCache
 
                 CacheStorage.Write(_currentFingerprint, bytes, metaJson);
                 sw.Stop();
-                Log.Message($"SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
+                _pipelineSw.Stop();
             }
             catch (Exception ex)
             {
