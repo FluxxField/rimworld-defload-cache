@@ -52,9 +52,10 @@ namespace FluxxField.DefLoadCache
             {
                 _pipelineSw.Restart();
 
-                if (DefLoadCacheMod.Settings != null && !DefLoadCacheMod.Settings.cacheEnabled)
+                var settings = DefLoadCacheMod.Settings;
+                if (settings != null && (!settings.cacheEnabled || !settings.skipModFileLoading))
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] caching disabled in settings, running normally");
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage G disabled in settings, running normally");
                     return false;
                 }
 
@@ -138,6 +139,12 @@ namespace FluxxField.DefLoadCache
             bool docMutated = false;
             try
             {
+                var settings = DefLoadCacheMod.Settings;
+                if (settings != null && (!settings.cacheEnabled || !settings.skipPatchApplication))
+                {
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage D disabled in settings, running normally");
+                    return false;
+                }
                 if (_currentFingerprint == null)
                 {
                     Log.Warning("TryLoadCached: no fingerprint cached, falling through to normal load");

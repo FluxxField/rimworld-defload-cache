@@ -21,34 +21,62 @@ namespace FluxxField.DefLoadCache
             var listing = new Listing_Standard();
             listing.Begin(inRect);
 
-            // Enable/disable
+            // --- Master toggle ---
             listing.CheckboxLabeled(
-                "Enable caching",
+                "Enable DefLoadCache",
                 ref Settings.cacheEnabled,
-                "When disabled, DefLoadCache will not read or write cache files. The game loads normally.");
+                "Master switch. When off, the mod does nothing and the game loads normally. " +
+                "Turn this off if you experience any issues after changing your mod list.");
 
-            listing.Gap();
+            if (Settings.cacheEnabled)
+            {
+                listing.Gap();
 
-            // Cache retention slider
-            Settings.maxCachedProfiles = (int)listing.SliderLabeled(
-                $"Max cached profiles: {Settings.maxCachedProfiles}",
-                Settings.maxCachedProfiles,
-                1f, 20f,
-                tooltip: "Number of modlist profile caches to keep on disk. Each is ~7 MB.");
+                // --- Skip mod file loading (Stage G) ---
+                listing.CheckboxLabeled(
+                    "Skip reading mod files on repeat launches",
+                    ref Settings.skipModFileLoading,
+                    "On the first launch with a mod list, RimWorld reads thousands of XML files " +
+                    "from every mod folder. This takes several minutes on large mod lists. " +
+                    "When enabled, repeat launches skip this step entirely and use the " +
+                    "cached result instead.\n\n" +
+                    "Disable this if you are actively editing mod XML files and want changes " +
+                    "to take effect without clearing the cache.");
 
-            listing.Gap();
+                listing.Gap();
 
-            // Diagnostic dump toggle
-            listing.CheckboxLabeled(
-                "Enable diagnostic dump (Stage E)",
-                ref Settings.diagnosticDumpEnabled,
-                "Writes a sorted DefDatabase snapshot to disk after loading. Used to verify cache correctness by comparing miss vs hit dumps.");
+                // --- Skip patch application (Stage D) ---
+                listing.CheckboxLabeled(
+                    "Skip applying XML patches on repeat launches",
+                    ref Settings.skipPatchApplication,
+                    "After reading mod files, RimWorld applies thousands of XML patches " +
+                    "(compatibility patches, balance changes, etc). This is the slowest " +
+                    "step — often 5+ minutes on large mod lists. When enabled, repeat " +
+                    "launches use the cached post-patch result instead of re-running " +
+                    "every patch.\n\n" +
+                    "Disable this if you are developing or debugging XML patches.");
+
+                listing.Gap();
+
+                // --- Max cached profiles ---
+                Settings.maxCachedProfiles = (int)listing.SliderLabeled(
+                    $"Saved mod list profiles: {Settings.maxCachedProfiles}",
+                    Settings.maxCachedProfiles,
+                    1f, 20f,
+                    tooltip: "How many different mod list configurations to keep cached. " +
+                    "Each cache is about 7 MB. If you frequently switch between mod lists " +
+                    "(e.g. using RimPy profiles), increase this so each list stays cached. " +
+                    "Older caches are automatically deleted when the limit is reached.");
+            }
 
             listing.Gap();
             listing.GapLine();
             listing.Gap();
 
-            // Cache info
+            // --- Cache info ---
+            listing.Label("Cache Information", tooltip: "Details about the current cache state.");
+            listing.Gap(4f);
+
             string cacheRoot = CacheStorage.CacheRoot;
             if (Directory.Exists(cacheRoot))
             {
@@ -58,30 +86,30 @@ namespace FluxxField.DefLoadCache
                 {
                     try { totalBytes += new FileInfo(f).Length; } catch { }
                 }
-                listing.Label($"Cache location: {cacheRoot}");
-                listing.Label($"Cached profiles: {files.Length}");
-                listing.Label($"Total cache size: {totalBytes / 1024} KB");
+                listing.Label($"  Location: {cacheRoot}");
+                listing.Label($"  Cached profiles: {files.Length} / {Settings.maxCachedProfiles}");
+                listing.Label($"  Disk usage: {totalBytes / 1024} KB ({totalBytes / 1024 / 1024} MB)");
             }
             else
             {
-                listing.Label("No cache files found.");
+                listing.Label("  No cache files found.");
             }
 
-            listing.Gap();
+            listing.Gap(4f);
 
             // Last run info
             if (CacheHook.CacheHitOccurred)
             {
-                listing.Label("Last launch: cache HIT");
+                listing.Label("  Last launch: Used cached data (fast launch)");
             }
             else if (CacheHook.LastRunWasMiss)
             {
-                listing.Label("Last launch: cache MISS (fresh cache written)");
+                listing.Label("  Last launch: Built fresh cache (first launch with this mod list)");
             }
 
             listing.Gap();
 
-            // Clear cache button
+            // --- Clear cache button ---
             if (listing.ButtonText("Clear all cached data"))
             {
                 if (Directory.Exists(cacheRoot))
@@ -90,9 +118,31 @@ namespace FluxxField.DefLoadCache
                     {
                         try { File.Delete(f); } catch { }
                     }
-                    Messages.Message("DefLoadCache: all cache files deleted.", MessageTypeDefOf.TaskCompletion, false);
+                    Messages.Message("DefLoadCache: all cache files deleted. Next launch will rebuild the cache.",
+                        MessageTypeDefOf.TaskCompletion, false);
                 }
             }
+            listing.Gap(4f);
+            listing.Label("  Use this if the game behaves oddly after changing mods. The next\n" +
+                          "  launch will take longer as the cache is rebuilt.",
+                tooltip: "Clearing the cache forces RimWorld to do a full load on the next launch.");
+
+            listing.Gap();
+            listing.GapLine();
+            listing.Gap();
+
+            // --- Advanced / Developer ---
+            listing.Label("Developer Options");
+            listing.Gap(4f);
+            listing.CheckboxLabeled(
+                "Write diagnostic snapshot after loading",
+                ref Settings.diagnosticDumpEnabled,
+                "Writes a detailed list of every loaded def to a file after the game " +
+                "finishes loading. This is used to verify that cached launches produce " +
+                "identical results to normal launches. Only enable this if asked to " +
+                "by a mod developer for debugging purposes.\n\n" +
+                "Files are saved in the cache folder as diagnostic-cache-hit.txt " +
+                "and diagnostic-cache-miss.txt.");
 
             listing.End();
         }
