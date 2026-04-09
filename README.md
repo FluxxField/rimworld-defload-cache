@@ -119,6 +119,25 @@ The `.csproj` references RimWorld's `Assembly-CSharp.dll`, `UnityEngine.CoreModu
 
 Uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Cecil types bundled inside `0Harmony.dll` (the same approach used by [Performance Fish](https://github.com/bbradson/Performance-Fish)).
 
+## Roadmap
+
+DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loading and patch application. There's more on the table.
+
+### Near-term improvements
+- **Binary cache format** — replace gzipped XML with a compact binary format (MessagePack or similar) for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
+- **Parallel fingerprint hashing** — fingerprint computation is already parallelized across mods, but individual About.xml reads could be further optimized or eliminated.
+- **`ErrorCheckPatches` skip on cache hit** — the 7.6 second gap between LoadModXML skip and ApplyPatches entry includes patch config validation that's unnecessary on cached launches.
+
+### Potential future features
+- **Deferred texture loading** — load textures in background threads while the user is at the main menu instead of blocking startup. Textures not needed until gameplay could be loaded on-demand, saving ~2-3 minutes of startup time.
+- **Cached parsed Def objects (Tier 2)** — skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires careful Harmony patch invalidation tracking.
+- **Prepatcher-based profiler with mod attribution** — a runtime profiler that uses Cecil to instrument Harmony-patched methods and attribute per-tick cost to specific mods. "Top 10 mods by tick cost" with drill-down to specific methods. Directly reuses the Prepatcher + Cecil infrastructure from DefLoadCache.
+- **Incremental patching** — on mod list changes where only new patches are added (none removed/modified), apply only the new patches to the cached doc instead of re-running everything.
+
+### The bigger vision
+
+RimWorld mod loading is structurally identical to a compiler pipeline: source files (mod XML) are parsed, merged, transformed (patches), and compiled into runtime objects (DefDatabase). DefLoadCache is Phase 1 of a broader **modlist compiler** project — caching the intermediate representation. Future phases would add profiling, static analysis, and optimization passes using the same Prepatcher + Cecil foundation.
+
 ## License
 
 MIT
