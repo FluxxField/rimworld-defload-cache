@@ -44,7 +44,7 @@ namespace FluxxField.DefLoadCache
             try
             {
                 _pipelineSw.Restart();
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] hook fired — Verse.LoadedModManager.ApplyPatches entered");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] hook fired — Verse.LoadedModManager.ApplyPatches entered");
 
                 var sw = Stopwatch.StartNew();
                 _currentFingerprint = ModlistFingerprint.Compute();
@@ -167,7 +167,7 @@ namespace FluxxField.DefLoadCache
         {
             if (CacheHitOccurred)
             {
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] ClearCachedPatches skipped — cache hit, patches were never executed");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] ClearCachedPatches skipped — cache hit, patches were never executed");
                 _pipelineSw.Stop();
                 return true;
             }
@@ -225,7 +225,7 @@ namespace FluxxField.DefLoadCache
 
                 CacheStorage.Write(_currentFingerprint, bytes, metaJson);
                 sw.Stop();
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
                 _pipelineSw.Stop();
             }
             catch (Exception ex)
