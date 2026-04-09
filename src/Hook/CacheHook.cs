@@ -26,6 +26,9 @@ namespace FluxxField.DefLoadCache
     {
         private static string? _currentFingerprint;
         internal static bool CacheHitOccurred;
+        internal static bool LastRunWasMiss;
+
+        internal static string? CurrentFingerprint => _currentFingerprint;
 
         /// <summary>
         /// Pipeline-wide stopwatch. Starts when HookFired enters (top of
@@ -48,6 +51,13 @@ namespace FluxxField.DefLoadCache
             try
             {
                 _pipelineSw.Restart();
+
+                if (DefLoadCacheMod.Settings != null && !DefLoadCacheMod.Settings.cacheEnabled)
+                {
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] caching disabled in settings, running normally");
+                    return false;
+                }
+
                 Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] Stage G — LoadModXML entered");
 
                 var sw = Stopwatch.StartNew();
@@ -294,6 +304,7 @@ namespace FluxxField.DefLoadCache
 
                 CacheStorage.Write(_currentFingerprint, bytes, metaJson);
                 sw.Stop();
+                LastRunWasMiss = true;
                 Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
                 _pipelineSw.Stop();
             }

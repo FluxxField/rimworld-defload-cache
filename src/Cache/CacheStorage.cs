@@ -12,7 +12,8 @@ namespace FluxxField.DefLoadCache
     /// </summary>
     internal static class CacheStorage
     {
-        private const int MaxCachedFilesToKeep = 10;
+        private static int MaxCachedFilesToKeep =>
+            DefLoadCacheMod.Settings?.maxCachedProfiles ?? 10;
 
         public static string CacheRoot
         {
