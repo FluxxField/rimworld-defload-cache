@@ -67,6 +67,7 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public static bool TryLoadCached(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
+            bool docMutated = false;
             try
             {
                 if (_currentFingerprint == null)
@@ -107,20 +108,21 @@ namespace FluxxField.DefLoadCache
                 // Deserialize the cached doc
                 XmlDocument cachedDoc = CacheFormat.Deserialize(bytes);
 
-                // Replace the working doc's contents with the cached doc's nodes.
-                // We mutate xmlDoc in place because Cecil IL passes it as a
-                // parameter; we can't reassign the parameter variable from
-                // inside this method and have the caller see the new reference.
+                // === POINT OF NO RETURN ===
+                // After RemoveAll(), xmlDoc is mutated. If anything throws
+                // between here and return true, the caller's xmlDoc is in a
+                // partially-populated state. Returning false would let the
+                // original ApplyPatches body run on corrupted state. The
+                // catch block detects this via docMutated and rethrows.
+                docMutated = true;
                 xmlDoc.RemoveAll();
                 foreach (XmlNode child in cachedDoc.ChildNodes)
                 {
+                    if (child.NodeType == XmlNodeType.XmlDeclaration) continue;
                     XmlNode imported = xmlDoc.ImportNode(child, deep: true);
                     xmlDoc.AppendChild(imported);
                 }
 
-                // Rebuild assetlookup from the embedded mod-attribution
-                // attributes on the NEW (imported) nodes, using the real
-                // LoadableXmlAsset instances we cached above.
                 assetlookup.Clear();
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset);
 
@@ -129,8 +131,13 @@ namespace FluxxField.DefLoadCache
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OutOfMemoryException))
             {
+                if (docMutated)
+                {
+                    Log.Error("TryLoadCached threw AFTER xmlDoc was already mutated — cannot recover, rethrowing", ex);
+                    throw;
+                }
                 Log.Error("TryLoadCached threw — falling through to normal ApplyPatches", ex);
                 return false;
             }
