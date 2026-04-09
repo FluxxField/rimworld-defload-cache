@@ -124,6 +124,7 @@ Uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Ceci
 DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loading and patch application. There's more on the table.
 
 ### Near-term improvements
+- **Content-aware fingerprinting** — the current fingerprint uses file counts and byte sizes as a fast proxy. A same-size content change (e.g., editing a value without changing file size) won't invalidate the cache. A future update will add modification-timestamp-aware content hashing to catch this edge case without hashing every file on every launch.
 - **Binary cache format** — replace gzipped XML with a compact binary format (MessagePack or similar) for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
 - **Parallel fingerprint hashing** — fingerprint computation is already parallelized across mods, but individual About.xml reads could be further optimized or eliminated.
 - **`ErrorCheckPatches` skip on cache hit** — the 7.6 second gap between LoadModXML skip and ApplyPatches entry includes patch config validation that's unnecessary on cached launches.
