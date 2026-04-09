@@ -164,5 +164,68 @@ namespace FluxxField.DefLoadCache.Prepatcher
 
             System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + TryLoadCached prefix + {retInstructions.Count} SaveToCache postfix(es) into ApplyPatches");
         }
+
+        /// <summary>
+        /// Injects a skip-prefix into ClearCachedPatches so that on cache-hit
+        /// runs the method is a no-op. Without this, ClearCachedPatches iterates
+        /// every PatchOperation and logs "failed" for each one (because patches
+        /// were never executed — ApplyPatches was skipped). On a 576-mod list
+        /// that's 10k+ error log writes.
+        ///
+        /// Layout after injection:
+        ///
+        ///   call ShouldSkipClearPatches       (returns true on cache hit)
+        ///   brtrue ret                        (skip entire method)
+        ///   &lt;original body&gt;
+        ///   ret
+        /// </summary>
+        [FreePatch]
+        private static void InjectClearCachedPatchesSkip(ModuleDefinition module)
+        {
+            var loadedModManagerType = module.GetType("Verse.LoadedModManager");
+            if (loadedModManagerType == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: Verse.LoadedModManager not found (ClearCachedPatches skip)");
+                return;
+            }
+
+            var clearMethod = loadedModManagerType.Methods
+                .FirstOrDefault(m => m.Name == "ClearCachedPatches");
+            if (clearMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ClearCachedPatches method not found");
+                return;
+            }
+
+            MethodInfo? shouldSkipMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.ShouldSkipClearPatches),
+                BindingFlags.Public | BindingFlags.Static);
+            if (shouldSkipMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ShouldSkipClearPatches not found via reflection");
+                return;
+            }
+
+            MethodReference shouldSkipRef = module.ImportReference(shouldSkipMethod);
+            ILProcessor il = clearMethod.Body.GetILProcessor();
+
+            if (clearMethod.Body.Instructions.Count == 0)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ClearCachedPatches body is empty");
+                return;
+            }
+
+            // Find the last ret to use as brtrue target
+            var lastRet = clearMethod.Body.Instructions.Last(i => i.OpCode == OpCodes.Ret);
+
+            Instruction firstInstruction = clearMethod.Body.Instructions[0];
+            var callSkip = il.Create(OpCodes.Call, shouldSkipRef);
+            var brSkip = il.Create(OpCodes.Brtrue, lastRet);
+
+            il.InsertBefore(firstInstruction, callSkip);
+            il.InsertBefore(firstInstruction, brSkip);
+
+            System.Console.WriteLine("[DefLoadCache] FreePatch: injected ShouldSkipClearPatches prefix into ClearCachedPatches");
+        }
     }
 }

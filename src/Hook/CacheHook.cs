@@ -23,6 +23,7 @@ namespace FluxxField.DefLoadCache
     public static class CacheHook
     {
         private static string? _currentFingerprint;
+        internal static bool CacheHitOccurred;
 
         /// <summary>
         /// Called by injected IL at the top of ApplyPatches. Computes and
@@ -129,6 +130,7 @@ namespace FluxxField.DefLoadCache
                 sw.Stop();
                 Log.Message($"cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
 
+                CacheHitOccurred = true;
                 return true;
             }
             catch (Exception ex) when (!(ex is OutOfMemoryException))
@@ -141,6 +143,24 @@ namespace FluxxField.DefLoadCache
                 Log.Error("TryLoadCached threw — falling through to normal ApplyPatches", ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Called by injected IL at the top of ClearCachedPatches. Returns true
+        /// on cache-hit runs so the injected brtrue skips the entire method body,
+        /// preventing thousands of spurious "patch operation failed" log entries
+        /// from patches that were never executed (because ApplyPatches was skipped).
+        ///
+        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipClearPatches)</c>.
+        /// </summary>
+        public static bool ShouldSkipClearPatches()
+        {
+            if (CacheHitOccurred)
+            {
+                Log.Message("ClearCachedPatches skipped — cache hit, patches were never executed");
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
