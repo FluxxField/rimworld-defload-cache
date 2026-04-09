@@ -227,5 +227,91 @@ namespace FluxxField.DefLoadCache.Prepatcher
 
             System.Console.WriteLine("[DefLoadCache] FreePatch: injected ShouldSkipClearPatches prefix into ClearCachedPatches");
         }
+
+        /// <summary>
+        /// Stage G: Injects a prefix into LoadModXML that skips the entire
+        /// method body when a cache file exists for the current fingerprint.
+        /// On skip, returns an empty List&lt;LoadableXmlAsset&gt; so
+        /// CombineIntoUnifiedXML produces a near-empty doc that TryLoadCached
+        /// will replace with the cached post-patch version.
+        ///
+        /// Layout after injection:
+        ///
+        ///   call ShouldSkipLoadModXML         (returns true if cache exists)
+        ///   brfalse originalBody              (false → run normally)
+        ///   newobj List&lt;LoadableXmlAsset&gt;()   (create empty list)
+        ///   ret                               (return empty list)
+        ///   originalBody:
+        ///   &lt;original method body&gt;
+        /// </summary>
+        [FreePatch]
+        private static void InjectLoadModXMLSkip(ModuleDefinition module)
+        {
+            var loadedModManagerType = module.GetType("Verse.LoadedModManager");
+            if (loadedModManagerType == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: Verse.LoadedModManager not found (LoadModXML skip)");
+                return;
+            }
+
+            var loadModXmlMethod = loadedModManagerType.Methods
+                .FirstOrDefault(m => m.Name == "LoadModXML");
+            if (loadModXmlMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: LoadModXML method not found");
+                return;
+            }
+
+            MethodInfo? shouldSkipMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.ShouldSkipLoadModXML),
+                BindingFlags.Public | BindingFlags.Static);
+            if (shouldSkipMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ShouldSkipLoadModXML not found via reflection");
+                return;
+            }
+
+            MethodReference shouldSkipRef = module.ImportReference(shouldSkipMethod);
+            ILProcessor il = loadModXmlMethod.Body.GetILProcessor();
+
+            if (loadModXmlMethod.Body.Instructions.Count == 0)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: LoadModXML body is empty");
+                return;
+            }
+
+            // Resolve List<LoadableXmlAsset> constructor for the empty-list return
+            var loadableXmlAssetType = module.GetType("Verse.LoadableXmlAsset");
+            if (loadableXmlAssetType == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: Verse.LoadableXmlAsset not found");
+                return;
+            }
+
+            // Import the generic List<LoadableXmlAsset> and its parameterless constructor
+            var listType = module.ImportReference(typeof(System.Collections.Generic.List<>));
+            var genericListType = new GenericInstanceType(listType);
+            genericListType.GenericArguments.Add(module.ImportReference(loadableXmlAssetType));
+
+            var listCtorDef = module.ImportReference(typeof(System.Collections.Generic.List<>))
+                .Resolve().Methods.First(m => m.IsConstructor && m.Parameters.Count == 0);
+            var listCtor = module.ImportReference(listCtorDef);
+            listCtor.DeclaringType = genericListType;
+
+            Instruction firstInstruction = loadModXmlMethod.Body.Instructions[0];
+
+            // Inject: call ShouldSkipLoadModXML / brfalse originalBody / newobj List() / ret
+            var callSkip = il.Create(OpCodes.Call, shouldSkipRef);
+            var brFalse = il.Create(OpCodes.Brfalse, firstInstruction);
+            var newList = il.Create(OpCodes.Newobj, listCtor);
+            var retEarly = il.Create(OpCodes.Ret);
+
+            il.InsertBefore(firstInstruction, callSkip);
+            il.InsertBefore(firstInstruction, brFalse);
+            il.InsertBefore(firstInstruction, newList);
+            il.InsertBefore(firstInstruction, retEarly);
+
+            System.Console.WriteLine("[DefLoadCache] FreePatch: injected ShouldSkipLoadModXML prefix into LoadModXML");
+        }
     }
 }

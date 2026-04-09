@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Xml;
 using Verse;
 
@@ -33,9 +35,48 @@ namespace FluxxField.DefLoadCache
         private static readonly Stopwatch _pipelineSw = new Stopwatch();
 
         /// <summary>
-        /// Called by injected IL at the top of ApplyPatches. Computes and
-        /// stashes the fingerprint. TryLoadCached (Stage D) reads this stash
-        /// to decide cache-hit vs miss without recomputing.
+        /// Called by injected IL at the top of LoadModXML (Stage G). Computes
+        /// the fingerprint early and checks if a cache file exists. If yes,
+        /// returns true — the injected brtrue skips LoadModXML's body and
+        /// returns an empty List, so LoadModXML + CombineIntoUnifiedXML are
+        /// effectively no-ops. The cached doc is loaded later in TryLoadCached.
+        ///
+        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipLoadModXML)</c>.
+        /// </summary>
+        public static bool ShouldSkipLoadModXML()
+        {
+            try
+            {
+                _pipelineSw.Restart();
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] Stage G — LoadModXML entered");
+
+                var sw = Stopwatch.StartNew();
+                _currentFingerprint = ModlistFingerprint.Compute();
+                sw.Stop();
+
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] fingerprint = {_currentFingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
+
+                if (CacheStorage.Exists(_currentFingerprint))
+                {
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] Stage G cache EXISTS — skipping LoadModXML file I/O");
+                    return true;
+                }
+
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage G cache MISS — LoadModXML will run normally");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("ShouldSkipLoadModXML threw — falling back to normal LoadModXML", ex);
+                _currentFingerprint = null;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Called by injected IL at the top of ApplyPatches. On Stage G hit,
+        /// fingerprint is already computed — just logs entry. On Stage G miss,
+        /// computes the fingerprint here (same as before Stage G existed).
         ///
         /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.HookFired)</c>.
         /// </summary>
@@ -43,6 +84,14 @@ namespace FluxxField.DefLoadCache
         {
             try
             {
+                // If Stage G already computed the fingerprint and started the
+                // pipeline stopwatch, don't restart — just log entry.
+                if (_currentFingerprint != null)
+                {
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] hook fired — ApplyPatches entered (fingerprint already computed by Stage G)");
+                    return;
+                }
+
                 _pipelineSw.Restart();
                 Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] hook fired — Verse.LoadedModManager.ApplyPatches entered");
 
@@ -98,20 +147,40 @@ namespace FluxxField.DefLoadCache
 
                 var sw = Stopwatch.StartNew();
 
-                // Build packageId -> LoadableXmlAsset map from the existing
-                // assetlookup BEFORE we mutate xmlDoc. Pick the first
-                // LoadableXmlAsset encountered per mod — they're all
-                // functionally equivalent for the fields ParseAndProcessXML
-                // actually reads (.mod).
+                // Build packageId -> LoadableXmlAsset map. On normal runs
+                // (Stage G miss), assetlookup is populated by
+                // CombineIntoUnifiedXML and we pick real instances. On Stage G
+                // hit, assetlookup is empty (LoadModXML was skipped), so we
+                // create minimal synthetic instances from RunningModsListForReading
+                // using FormatterServices to bypass the readonly constructor.
                 var packageIdToAsset = new Dictionary<string, LoadableXmlAsset>();
-                foreach (var kvp in assetlookup)
+                if (assetlookup.Count > 0)
                 {
-                    var asset = kvp.Value;
-                    if (asset?.mod?.PackageId == null) continue;
-                    if (!packageIdToAsset.ContainsKey(asset.mod.PackageId))
+                    foreach (var kvp in assetlookup)
                     {
-                        packageIdToAsset[asset.mod.PackageId] = asset;
+                        var asset = kvp.Value;
+                        if (asset?.mod?.PackageId == null) continue;
+                        if (!packageIdToAsset.ContainsKey(asset.mod.PackageId))
+                        {
+                            packageIdToAsset[asset.mod.PackageId] = asset;
+                        }
                     }
+                }
+                else
+                {
+                    // Stage G hit path: build synthetic LoadableXmlAsset per mod.
+                    // ParseAndProcessXML reads asset.mod (for def.modContentPack)
+                    // and asset.name (for def.fileName). We set both via reflection.
+                    foreach (var mod in LoadedModManager.RunningModsListForReading)
+                    {
+                        if (mod?.PackageId == null) continue;
+                        var asset = CreateSyntheticAsset(mod);
+                        if (asset != null)
+                        {
+                            packageIdToAsset[mod.PackageId] = asset;
+                        }
+                    }
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] built {packageIdToAsset.Count} synthetic LoadableXmlAssets for Stage G cache hit");
                 }
 
                 // === POINT OF NO RETURN ===
@@ -231,6 +300,37 @@ namespace FluxxField.DefLoadCache
             catch (Exception ex)
             {
                 Log.Error("SaveToCache threw — cache not saved (game continues normally)", ex);
+            }
+        }
+
+        /// <summary>
+        /// Reflection fields for setting readonly members on LoadableXmlAsset.
+        /// Cached once for performance. Used only on Stage G cache-hit path.
+        /// </summary>
+        private static readonly FieldInfo? _assetModField =
+            typeof(LoadableXmlAsset).GetField("mod", BindingFlags.Public | BindingFlags.Instance);
+        private static readonly FieldInfo? _assetNameField =
+            typeof(LoadableXmlAsset).GetField("name", BindingFlags.Public | BindingFlags.Instance);
+
+        /// <summary>
+        /// Creates a minimal LoadableXmlAsset with only the mod and name fields
+        /// set. Uses FormatterServices.GetUninitializedObject to bypass the
+        /// constructor (which does file I/O), then sets readonly fields via
+        /// reflection. ParseAndProcessXML only reads asset.mod and asset.name.
+        /// </summary>
+        private static LoadableXmlAsset? CreateSyntheticAsset(ModContentPack mod)
+        {
+            try
+            {
+                var asset = (LoadableXmlAsset)FormatterServices.GetUninitializedObject(typeof(LoadableXmlAsset));
+                _assetModField?.SetValue(asset, mod);
+                _assetNameField?.SetValue(asset, "cached");
+                return asset;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"CreateSyntheticAsset failed for {mod.PackageId}", ex);
+                return null;
             }
         }
     }
