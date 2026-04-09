@@ -3,16 +3,24 @@
   <name>DefLoadCache</name>
   <author>FluxxField</author>
   <packageId>fluxxfield.defloadcache</packageId>
+  <url>https://github.com/FluxxField/rimworld-defload-cache</url>
   <supportedVersions>
     <li>1.6</li>
   </supportedVersions>
-  <description>POC: caches the merged post-patch XmlDocument from Verse.LoadedModManager.ApplyPatches to disk and short-circuits the XPath walk on cache-hit launches. Targets the largest single contributor to modded RimWorld load time.
+  <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
 
-Tier 1 cache (XmlDocument level only). LoadModXML and CombineIntoUnifiedXML still run on cache-hit. ParseAndProcessXML and cross-reference resolution always run normally.
+On the first launch with a given mod list, DefLoadCache builds a cache of the fully-patched def tree. On subsequent launches with the same mod list, it skips reading thousands of XML files from disk and re-running thousands of XML patches — loading the cached result instead.
 
-Hard depends on Prepatcher (uses [FreePatch] to inject IL into ApplyPatches before the CLR verifies Assembly-CSharp).
+Tested on a 576-mod load order: launch time reduced from ~14 minutes to ~8 minutes (45% faster). The mod XML loading and patch application pipeline specifically goes from ~6 minutes to ~23 seconds.
 
-Status: experimental POC. Brittle invalidation. Not for general use.</description>
+Features:
+- Automatic cache invalidation when mods, RimWorld version, or DLLs change
+- Support for multiple mod list profiles (switch between RimPy profiles without losing caches)
+- Configurable settings with per-feature toggles
+- Safe fallback: if anything goes wrong, the game loads normally
+- Zero gameplay impact: only affects load time
+
+Requires Prepatcher.</description>
   <modDependencies>
     <li>
       <packageId>jikulopo.prepatcher</packageId>
