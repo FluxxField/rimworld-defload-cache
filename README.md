@@ -86,8 +86,12 @@ DefLoadCache uses [Prepatcher](https://steamcommunity.com/sharedfiles/filedetail
 
 The fingerprint includes:
 - RimWorld version
-- Per-mod: packageId, version, `Defs/` and `Patches/` file counts and sizes (respecting `LoadFolders.xml`), `Assemblies/*.dll` sizes
+- Per-mod: packageId, version from `About.xml`
+- Per-mod: `Defs/`, `Patches/` file counts, total byte sizes, and **latest modification timestamps** (respecting `LoadFolders.xml` version-specific paths)
+- Per-mod: `Assemblies/*.dll` file counts, sizes, and modification timestamps
 - Cache format version
+
+Any change to any file — including same-size content edits (e.g., changing `cost=1000` to `cost=9000`) — updates the file's modification timestamp, which changes the fingerprint and triggers a full cache rebuild.
 
 Any change to any of these causes a cache miss and full rebuild.
 
