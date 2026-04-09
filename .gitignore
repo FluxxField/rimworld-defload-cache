@@ -14,3 +14,6 @@ Assemblies/*.pdb
 # OS
 .DS_Store
 Thumbs.db
+
+# Internal planning docs
+docs/superpowers/
