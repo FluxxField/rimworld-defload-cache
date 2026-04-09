@@ -65,6 +65,27 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
+        /// Strips data-defloadcache-mod attributes from all top-level def nodes.
+        /// Called after serialization so the live doc passed to ParseAndProcessXML
+        /// on cache-miss runs is identical to the doc on cache-hit runs (where
+        /// RebuildAssetLookup strips them during deserialization).
+        /// </summary>
+        public static void UnstampAttributions(XmlDocument doc)
+        {
+            if (doc?.DocumentElement == null) return;
+
+            foreach (XmlNode node in doc.DocumentElement.ChildNodes)
+            {
+                if (node.NodeType != XmlNodeType.Element) continue;
+                if (!(node is XmlElement element)) continue;
+                if (element.HasAttribute(AttributeName))
+                {
+                    element.RemoveAttribute(AttributeName);
+                }
+            }
+        }
+
+        /// <summary>
         /// Rebuilds the assetlookup dictionary from the data-defloadcache-mod
         /// attributes embedded on top-level def nodes during caching. Used by
         /// TryLoadCached on cache hit to reproduce the mod-attribution state

@@ -182,6 +182,7 @@ namespace FluxxField.DefLoadCache
                 var sw = Stopwatch.StartNew();
                 ModAttributionTagger.StampAttributions(xmlDoc, assetlookup);
                 byte[] bytes = CacheFormat.Serialize(xmlDoc);
+                ModAttributionTagger.UnstampAttributions(xmlDoc);
 
                 string metaJson = "{"
                     + $"\"timestamp\":\"{DateTime.UtcNow:o}\","

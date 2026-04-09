@@ -14,7 +14,7 @@ namespace FluxxField.DefLoadCache
         {
             using (var ms = new MemoryStream())
             {
-                using (var gz = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+                using (var gz = new GZipStream(ms, CompressionLevel.Fastest, leaveOpen: true))
                 using (var writer = XmlWriter.Create(gz, new XmlWriterSettings
                 {
                     Encoding = System.Text.Encoding.UTF8,
