@@ -23,13 +23,13 @@ Features:
 Requires Prepatcher.</description>
   <modDependencies>
     <li>
-      <packageId>jikulopo.prepatcher</packageId>
+      <packageId>zetrith.prepatcher</packageId>
       <displayName>Prepatcher</displayName>
       <steamWorkshopUrl>steam://url/CommunityFilePage/3563469557</steamWorkshopUrl>
     </li>
   </modDependencies>
   <loadAfter>
-    <li>jikulopo.prepatcher</li>
+    <li>zetrith.prepatcher</li>
     <li>brrainz.harmony</li>
   </loadAfter>
 </ModMetaData>
