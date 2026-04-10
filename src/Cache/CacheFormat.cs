@@ -6,7 +6,7 @@ namespace FluxxField.DefLoadCache
 {
     /// <summary>
     /// XmlDocument &lt;-&gt; gzipped UTF-8 byte stream. No mod-attribution
-    /// processing — that lives in ModAttributionTagger.
+    /// processing, that lives in ModAttributionTagger.
     /// </summary>
     internal static class CacheFormat
     {

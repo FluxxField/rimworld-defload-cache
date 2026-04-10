@@ -5,7 +5,7 @@ namespace FluxxField.DefLoadCache
 {
     /// <summary>
     /// Emits a structured status block to the RimWorld log after all defs
-    /// are loaded. Runs on every launch — cache hit, miss, or disabled.
+    /// are loaded. Runs on every launch: cache hit, miss, or disabled.
     /// Modders can search for this block in player logs to instantly see
     /// whether DefLoadCache was involved in a reported issue.
     /// </summary>
@@ -70,25 +70,25 @@ namespace FluxxField.DefLoadCache
                 else if (CacheValidator.LastValidationPassed == false)
                 {
                     defsLine = $"Defs loaded: {CacheValidator.LastActualTotal:N0} (expected: {CacheValidator.LastExpectedTotal:N0} MISMATCH)";
-                    validationLine = "Validation:  FAILED — cache deleted, next launch will be clean";
+                    validationLine = "Validation:  FAILED, cache deleted, next launch will be clean";
                 }
                 else
                 {
                     defsLine = "Defs loaded: (no baseline available)";
-                    validationLine = "Validation:  SKIPPED — no baseline in meta (old cache format)";
+                    validationLine = "Validation:  SKIPPED, no baseline in meta (old cache format)";
                 }
             }
             else if (CacheHook.LastRunWasMiss)
             {
                 result = "Cache MISS (full load)";
                 defsLine = "Defs loaded: full pipeline ran";
-                validationLine = "Validation:  N/A — no cache used";
+                validationLine = "Validation:  N/A, no cache used";
             }
             else
             {
                 result = "DISABLED or not triggered";
                 defsLine = "Defs loaded: full pipeline ran";
-                validationLine = "Validation:  N/A — cache not active";
+                validationLine = "Validation:  N/A, cache not active";
             }
 
             Log.Message(Border);

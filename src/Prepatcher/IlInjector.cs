@@ -144,7 +144,7 @@ namespace FluxxField.DefLoadCache.Prepatcher
             //    The brtrue operand targets the LAST ret directly (Cecil
             //    preserves Instruction references, so even though we've
             //    inserted instructions before ret in Stage C, brtrue's
-            //    operand is still ret — the branch lands past the whole
+            //    operand is still ret, so the branch lands past the whole
             //    SaveToCache postfix).
             //
             //    This step MUST run AFTER the Stage C retargeting loop above.
@@ -169,7 +169,7 @@ namespace FluxxField.DefLoadCache.Prepatcher
         /// Injects a skip-prefix into ClearCachedPatches so that on cache-hit
         /// runs the method is a no-op. Without this, ClearCachedPatches iterates
         /// every PatchOperation and logs "failed" for each one (because patches
-        /// were never executed — ApplyPatches was skipped). On a 576-mod list
+        /// were never executed, since ApplyPatches was skipped). On a 576-mod list
         /// that's 10k+ error log writes.
         ///
         /// Layout after injection:

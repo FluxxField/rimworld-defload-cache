@@ -24,7 +24,7 @@ namespace FluxxField.DefLoadCache
         /// Validates the loaded cache document against the baseline node
         /// counts in meta.json. Returns true if valid or if validation
         /// cannot be performed (missing meta, old format). Returns false
-        /// on mismatch — caller should still return true from TryLoadCached
+        /// on mismatch, caller should still return true from TryLoadCached
         /// (doc is already mutated) but the bad cache is cleaned up.
         /// </summary>
         internal static bool Validate(
@@ -43,7 +43,7 @@ namespace FluxxField.DefLoadCache
             int? expectedTotal = ParseInt(metaJson, "totalNodeCount");
             if (expectedTotal == null)
             {
-                // Old format (v3) — no node counts stored, skip validation
+                // Old format (v3), no node counts stored, skip validation
                 Log.Message("CacheValidator: meta.json has no totalNodeCount (old format), skipping validation");
                 LastValidationPassed = null;
                 return true;
@@ -60,7 +60,7 @@ namespace FluxxField.DefLoadCache
             // Check total first
             if (actualTotal != expectedTotal.Value)
             {
-                Log.Error($"CacheValidator: total node count mismatch — expected {expectedTotal.Value}, got {actualTotal}");
+                Log.Error($"CacheValidator: total node count mismatch, expected {expectedTotal.Value}, got {actualTotal}");
                 OnValidationFailed(fingerprint);
                 return false;
             }
@@ -97,7 +97,7 @@ namespace FluxxField.DefLoadCache
                 }
             }
 
-            Log.Message($"CacheValidator: validation PASSED — {actualTotal} nodes match baseline");
+            Log.Message($"CacheValidator: validation PASSED, {actualTotal} nodes match baseline");
             LastValidationPassed = true;
             return true;
         }
@@ -130,7 +130,7 @@ namespace FluxxField.DefLoadCache
 
         /// <summary>
         /// Parses an integer value from a JSON string by key name.
-        /// Simple regex-based — no JSON library needed.
+        /// Simple regex-based, no JSON library needed.
         /// </summary>
         private static int? ParseInt(string json, string key)
         {

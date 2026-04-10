@@ -25,7 +25,7 @@ namespace FluxxField.DefLoadCache
         /// Nodes that have no entry in assetlookup (e.g. nodes inserted by
         /// patches that don't register with the lookup) are left unstamped.
         /// Stage D's RebuildAssetLookup will handle unstamped nodes gracefully
-        /// by leaving them out of the rebuilt assetlookup — ParseAndProcessXML
+        /// by leaving them out of the rebuilt assetlookup. ParseAndProcessXML
         /// passes null to XmlInheritance.TryRegister for those, which is the
         /// same behavior as vanilla when the lookup misses.
         /// </summary>
@@ -37,7 +37,7 @@ namespace FluxxField.DefLoadCache
             int missing = 0;
 
             // Snapshot the child nodes first because we're mutating attributes
-            // while iterating — not strictly required for attribute edits, but
+            // while iterating. Not strictly required for attribute edits, but
             // cheap insurance against XmlNodeList lazy evaluation quirks.
             var children = new List<XmlNode>();
             foreach (XmlNode node in doc.DocumentElement.ChildNodes)
@@ -113,7 +113,7 @@ namespace FluxxField.DefLoadCache
 
                 string packageId = element.GetAttribute(AttributeName);
 
-                // Count before stripping — this feeds CacheValidator
+                // Count before stripping, this feeds CacheValidator
                 if (!string.IsNullOrEmpty(packageId))
                 {
                     if (countsByMod.ContainsKey(packageId))

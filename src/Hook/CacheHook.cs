@@ -18,7 +18,7 @@ namespace FluxxField.DefLoadCache
     /// Stage D: TryLoadCached (prefix) checks for a cache file matching the
     ///          current fingerprint. On hit, replaces the working XmlDocument
     ///          with the cached version, rebuilds assetlookup from the
-    ///          embedded attribution attributes, and returns true — the
+    ///          embedded attribution attributes, and returns true. The
     ///          injected brtrue then branches past the original body AND
     ///          SaveToCache directly to ret.
     /// </summary>
@@ -40,7 +40,7 @@ namespace FluxxField.DefLoadCache
         /// <summary>
         /// Called by injected IL at the top of LoadModXML (Stage G). Computes
         /// the fingerprint early and checks if a cache file exists. If yes,
-        /// returns true — the injected brtrue skips LoadModXML's body and
+        /// returns true. The injected brtrue skips LoadModXML's body and
         /// returns an empty List, so LoadModXML + CombineIntoUnifiedXML are
         /// effectively no-ops. The cached doc is loaded later in TryLoadCached.
         ///
@@ -59,7 +59,7 @@ namespace FluxxField.DefLoadCache
                 {
                     settings.skipNextLaunch = false;
                     try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
-                    Log.Message("skipNextLaunch was set — running full uncached load this launch");
+                    Log.Message("skipNextLaunch was set, running full uncached load this launch");
                     return false;
                 }
 
@@ -76,16 +76,16 @@ namespace FluxxField.DefLoadCache
 
                 if (CacheStorage.Exists(_currentFingerprint))
                 {
-                    Log.Message("Cache found — skipping mod file loading");
+                    Log.Message("Cache found, skipping mod file loading");
                     return true;
                 }
 
-                Log.Message("No cache found — loading mod files normally");
+                Log.Message("No cache found, loading mod files normally");
                 return false;
             }
             catch (Exception ex)
             {
-                Log.Error("ShouldSkipLoadModXML threw — falling back to normal LoadModXML", ex);
+                Log.Error("ShouldSkipLoadModXML threw, falling back to normal LoadModXML", ex);
                 _currentFingerprint = null;
                 return false;
             }
@@ -93,7 +93,7 @@ namespace FluxxField.DefLoadCache
 
         /// <summary>
         /// Called by injected IL at the top of ApplyPatches. On Stage G hit,
-        /// fingerprint is already computed — just logs entry. On Stage G miss,
+        /// fingerprint is already computed, so it just logs entry. On Stage G miss,
         /// computes the fingerprint here (same as before Stage G existed).
         ///
         /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.HookFired)</c>.
@@ -103,7 +103,7 @@ namespace FluxxField.DefLoadCache
             try
             {
                 // If Stage G already computed the fingerprint and started the
-                // pipeline stopwatch, don't restart — just log entry.
+                // pipeline stopwatch, don't restart. Just log entry.
                 if (_currentFingerprint != null)
                 {
                     return;
@@ -119,7 +119,7 @@ namespace FluxxField.DefLoadCache
             }
             catch (Exception ex)
             {
-                Log.Error("HookFired threw — falling back to no-op", ex);
+                Log.Error("HookFired threw, falling back to no-op", ex);
                 _currentFingerprint = null;
             }
         }
@@ -153,7 +153,7 @@ namespace FluxxField.DefLoadCache
                 {
                     settings.skipNextLaunch = false;
                     try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
-                    Log.Message("skipNextLaunch was set — running normal ApplyPatches");
+                    Log.Message("skipNextLaunch was set, running normal ApplyPatches");
                     return false;
                 }
                 if (_currentFingerprint == null)
@@ -169,7 +169,7 @@ namespace FluxxField.DefLoadCache
 
                 if (!CacheStorage.Exists(_currentFingerprint))
                 {
-                    Log.Message("Cache MISS — applying patches normally");
+                    Log.Message("Cache MISS, applying patches normally");
                     return false;
                 }
 
@@ -238,7 +238,7 @@ namespace FluxxField.DefLoadCache
                 CacheValidator.Validate(_currentFingerprint!, actualCountsByMod);
 
                 sw.Stop();
-                Log.Message($"Cache HIT — loaded {rebuilt} defs from cache in {sw.ElapsedMilliseconds}ms");
+                Log.Message($"Cache HIT, loaded {rebuilt} defs from cache in {sw.ElapsedMilliseconds}ms");
 
                 CacheHitOccurred = true;
                 return true;
@@ -247,10 +247,10 @@ namespace FluxxField.DefLoadCache
             {
                 if (docMutated)
                 {
-                    Log.Error("TryLoadCached threw AFTER xmlDoc was already mutated — cannot recover, rethrowing", ex);
+                    Log.Error("TryLoadCached threw AFTER xmlDoc was already mutated. Cannot recover, rethrowing.", ex);
                     throw;
                 }
-                Log.Error("TryLoadCached threw — falling through to normal ApplyPatches", ex);
+                Log.Error("TryLoadCached threw, falling through to normal ApplyPatches", ex);
                 return false;
             }
         }
@@ -268,7 +268,7 @@ namespace FluxxField.DefLoadCache
             if (CacheHitOccurred)
             {
                 _pipelineSw.Stop();
-                Log.Message($"Loading complete — total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
+                Log.Message($"Loading complete, total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
                 return true;
             }
             return false;
@@ -278,7 +278,7 @@ namespace FluxxField.DefLoadCache
         /// Called by injected IL before every ret instruction in ApplyPatches.
         /// On cache-miss runs, this stamps attribution, serializes, and writes
         /// the cache. On cache-hit runs, the brtrue in TryLoadCached's injected
-        /// prefix jumps PAST this call directly to ret — so SaveToCache is
+        /// prefix jumps PAST this call directly to ret, so SaveToCache is
         /// NOT invoked on cache-hit (no no-op check needed here).
         ///
         /// The "cache file already exists, skipping save" guard IS still
@@ -345,11 +345,11 @@ namespace FluxxField.DefLoadCache
                 sw.Stop();
                 LastRunWasMiss = true;
                 _pipelineSw.Stop();
-                Log.Message($"Cache saved — {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({bytes.Length / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
+                Log.Message($"Cache saved, {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({bytes.Length / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {
-                Log.Error("SaveToCache threw — cache not saved (game continues normally)", ex);
+                Log.Error("SaveToCache threw, cache not saved (game continues normally)", ex);
             }
         }
 
@@ -400,7 +400,7 @@ namespace FluxxField.DefLoadCache
 
                 string packageId = element.GetAttribute(ModAttributionTagger.AttributeName);
                 if (string.IsNullOrEmpty(packageId))
-                    continue; // Skip unattributed nodes — RebuildAssetLookup also skips them
+                    continue; // Skip unattributed nodes, RebuildAssetLookup also skips them
 
                 if (counts.ContainsKey(packageId))
                     counts[packageId]++;

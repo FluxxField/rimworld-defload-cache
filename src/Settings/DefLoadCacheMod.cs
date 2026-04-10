@@ -51,7 +51,7 @@ namespace FluxxField.DefLoadCache
                     ref Settings.skipPatchApplication,
                     "After reading mod files, RimWorld applies thousands of XML patches " +
                     "(compatibility patches, balance changes, etc). This is the slowest " +
-                    "step — often 5+ minutes on large mod lists. When enabled, repeat " +
+                    "step, often 5+ minutes on large mod lists. When enabled, repeat " +
                     "launches use the cached post-patch result instead of re-running " +
                     "every patch.\n\n" +
                     "Disable this if you are developing or debugging XML patches.");
@@ -132,7 +132,7 @@ namespace FluxxField.DefLoadCache
             // --- Test without cache (one-launch skip) ---
             if (listing.ButtonText("Test without cache (next launch only)",
                 "Temporarily disables the cache for one launch to help isolate issues. " +
-                "The cache is preserved — if the issue goes away, it was cache-related. " +
+                "The cache is preserved. If the issue goes away, it was cache-related. " +
                 "If it persists, DefLoadCache is not involved."))
             {
                 Settings.skipNextLaunch = true;
@@ -141,7 +141,7 @@ namespace FluxxField.DefLoadCache
             }
             listing.Gap(4f);
             listing.Label("  Use this to check if a bug you're experiencing is caused by\n" +
-                          "  DefLoadCache. The cache is kept — only one launch is affected.",
+                          "  DefLoadCache. The cache is kept, only one launch is affected.",
                 tooltip: "After one uncached launch, the cache is automatically re-enabled.");
 
             listing.Gap();

@@ -73,7 +73,7 @@ namespace FluxxField.DefLoadCache
                     }
                 }
 
-                // Assemblies — DLL changes can introduce new PatchOperation
+                // Assemblies: DLL changes can introduce new PatchOperation
                 // subclasses or runtime-generated defs. Walk root Assemblies/
                 // since that's where RimWorld loads them from regardless of
                 // LoadFolders.xml.

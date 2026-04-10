@@ -53,7 +53,7 @@
     <!-- DoNotPublicize: .NET base types bundled inside 0Harmony via ILRepack that
          would collide with mscorlib/System.* if made public. Mirrors the
          exclusion list from bbradson/Performance-Fish.
-         NOTE: Mono.Collections.Generic.Collection`1 is intentionally NOT excluded —
+         NOTE: Mono.Collections.Generic.Collection`1 is intentionally NOT excluded.
          IlInjector needs Count and the indexer on Cecil's InstructionCollection,
          which inherits from this type. It lives in the Mono.* namespace (not
          System.*), so it doesn't collide with mscorlib types. -->

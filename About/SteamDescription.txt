@@ -4,15 +4,15 @@
 Tired of waiting 10-15 minutes every time you launch your 500+ mod list? DefLoadCache caches the results of mod loading so you don't pay that cost every single time.
 
 [h2]How it works[/h2]
-Every time RimWorld launches, it reads thousands of XML files from every mod and then applies thousands of XML patches (compatibility fixes, balance changes, etc). On large mod lists, this takes [b]5-7 minutes[/b] — and it does it from scratch every launch, even if nothing changed.
+Every time RimWorld launches, it reads thousands of XML files from every mod and then applies thousands of XML patches (compatibility fixes, balance changes, etc). On large mod lists, this takes [b]5-7 minutes[/b], and it does it from scratch every launch, even if nothing changed.
 
 DefLoadCache saves the result after the first launch. On every launch after that with the same mod list, it loads the cached result in seconds instead of redoing all that work.
 
 [h2]Performance[/h2]
 Tested on a 576-mod Combat Extended milsim load order:
 [list]
-[*] Total launch time: [b]~14 min → ~8 min[/b] (45% faster)
-[*] Mod XML loading + patching: [b]~6 min → ~23 seconds[/b]
+[*] Total launch time: [b]~14 min to ~8 min[/b] (45% faster)
+[*] Mod XML loading + patching: [b]~6 min to ~23 seconds[/b]
 [*] Cache size: ~7 MB per mod list
 [/list]
 
@@ -20,21 +20,21 @@ Your results will vary based on mod count, hardware, and which mods you run. Lar
 
 [h2]Features[/h2]
 [list]
-[*] [b]Works with any mod manager[/b] — RimPy, RimSort, or manual. DefLoadCache fingerprints whatever mods are active regardless of how they got there. Each mod list configuration gets its own cache automatically.
-[*] [b]Automatic cache invalidation[/b] — the cache rebuilds automatically when you add, remove, or update mods. No manual clearing needed.
-[*] [b]Multiple mod list profiles[/b] — keeps separate caches for different mod lists. Switch between RimPy profiles without losing your cached data.
-[*] [b]Per-feature toggles[/b] — independently enable/disable "skip reading mod files" and "skip applying patches" from mod settings.
-[*] [b]Safe fallback[/b] — if anything goes wrong, the game loads normally as if DefLoadCache isn't installed. No risk of save corruption.
-[*] [b]Zero gameplay impact[/b] — only affects load time. No changes to gameplay, defs, or balance.
+[*] [b]Works with any mod manager.[/b] RimPy, RimSort, or manual. DefLoadCache fingerprints whatever mods are active regardless of how they got there. Each mod list configuration gets its own cache automatically.
+[*] [b]Automatic cache invalidation.[/b] The cache rebuilds automatically when you add, remove, or update mods. No manual clearing needed.
+[*] [b]Multiple mod list profiles.[/b] Keeps separate caches for different mod lists. Switch between RimPy profiles without losing your cached data.
+[*] [b]Per-feature toggles.[/b] Independently enable/disable "skip reading mod files" and "skip applying patches" from mod settings.
+[*] [b]Safe fallback.[/b] If anything goes wrong, the game loads normally as if DefLoadCache isn't installed. No risk of save corruption.
+[*] [b]Zero gameplay impact.[/b] Only affects load time. No changes to gameplay, defs, or balance.
 [/list]
 
 [h2]Safety & Self-Validation[/h2]
 DefLoadCache is designed to never cause problems for other mods. If something goes wrong, it catches itself:
 [list]
-[*] [b]Post-load validation[/b] — on every cache hit, the mod verifies per-mod def counts against the baseline stored when the cache was built. If anything doesn't match, the bad cache is automatically deleted.
-[*] [b]Self-healing[/b] — a bad cache never survives two launches. Validation failure forces a clean uncached load on the next restart.
-[*] [b]One-click isolation testing[/b] — click "Test without cache (next launch only)" in mod settings to check if an issue is cache-related. The cache is preserved and re-enables automatically.
-[*] [b]Structured log output[/b] — every launch emits a status block in the log showing cache state and validation results. Modders reviewing player logs can instantly see whether DefLoadCache was involved in a reported issue.
+[*] [b]Post-load validation.[/b] On every cache hit, the mod verifies per-mod def counts against the baseline stored when the cache was built. If anything doesn't match, the bad cache is automatically deleted.
+[*] [b]Self-healing.[/b] A bad cache never survives two launches. Validation failure forces a clean uncached load on the next restart.
+[*] [b]One-click isolation testing.[/b] Click "Test without cache (next launch only)" in mod settings to check if an issue is cache-related. The cache is preserved and re-enables automatically.
+[*] [b]Structured log output.[/b] Every launch emits a status block in the log showing cache state and validation results. Modders reviewing player logs can instantly see whether DefLoadCache was involved in a reported issue.
 [/list]
 
 [h2]For Mod Authors[/h2]
@@ -48,7 +48,7 @@ No. DefLoadCache only affects how fast the game loads. It doesn't change any def
 No. The cache automatically detects when your mod list, mod versions, or DLLs change and rebuilds from scratch. You should never need to manually clear the cache under normal use.
 
 [b]Q: Why is the first launch still slow?[/b]
-The first launch with a new mod list has to build the cache — it runs everything normally and saves the result. Every launch after that is faster.
+The first launch with a new mod list has to build the cache. It runs everything normally and saves the result. Every launch after that is faster.
 
 [b]Q: What if I'm developing a mod?[/b]
 Go to Options > Mod Settings > DefLoadCache and disable "Skip reading mod files" or "Skip applying patches" while you're testing changes. Or hit "Clear all cached data" to force a full rebuild.
@@ -70,7 +70,7 @@ Access via [b]Options > Mod Settings > DefLoadCache[/b]:
 [*] Set how many mod list profiles to keep cached (default 10)
 [*] View cache info (size, location, last launch status)
 [*] Clear all cached data
-[*] Test without cache (next launch only) — one-click isolation testing
+[*] Test without cache (next launch only), for one-click isolation testing
 [*] Developer diagnostic dump for verifying correctness
 [/list]
 
@@ -82,14 +82,14 @@ Access via [b]Options > Mod Settings > DefLoadCache[/b]:
 [/list]
 
 [h2]Source Code[/h2]
-[url=https://github.com/FluxxField/rimworld-defload-cache]GitHub[/url] — MIT licensed, contributions welcome.
+[url=https://github.com/FluxxField/rimworld-defload-cache]GitHub[/url]. MIT licensed, contributions welcome.
 
 [h2]Roadmap[/h2]
 DefLoadCache currently saves ~6 minutes on a 576-mod list. There's more coming.
 
 [b]Near-term[/b]
 [list]
-[*] Per-file content checksums — avoid false cache invalidations when Steam re-downloads unchanged mods
+[*] Per-file content checksums to avoid false cache invalidations when Steam re-downloads unchanged mods
 [*] Binary cache format for faster cache loading
 [*] Skip unnecessary patch validation on cached launches
 [*] Further fingerprint optimizations
@@ -97,14 +97,14 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list. There's more coming.
 
 [b]Planned[/b]
 [list]
-[*] Deferred texture loading — load textures in the background instead of blocking startup, potentially saving another 2-3 minutes
-[*] Cached parsed Def objects — skip even more of the loading pipeline for near-instant launches
-[*] Incremental patching — when adding a small patch mod, only apply the new patches instead of rebuilding everything
+[*] Deferred texture loading. Load textures in the background instead of blocking startup, potentially saving another 2-3 minutes.
+[*] Cached parsed Def objects. Skip even more of the loading pipeline for near-instant launches.
+[*] Incremental patching. When adding a small patch mod, only apply the new patches instead of rebuilding everything.
 [/list]
 
 [b]Future vision[/b]
 [list]
-[*] Prepatcher-based runtime profiler with per-mod attribution — see which mods are costing you the most FPS with a live "top 10 mods by tick cost" overlay
+[*] Prepatcher-based runtime profiler with per-mod attribution. See which mods are costing you the most FPS with a live "top 10 mods by tick cost" overlay.
 [/list]
 
 Have ideas or want to contribute? Check the [url=https://github.com/FluxxField/rimworld-defload-cache]source on GitHub[/url].

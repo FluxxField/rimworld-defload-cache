@@ -9,7 +9,7 @@
   </supportedVersions>
   <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
 
-On the first launch with a given mod list, DefLoadCache builds a cache of the fully-patched def tree. On subsequent launches with the same mod list, it skips reading thousands of XML files from disk and re-running thousands of XML patches — loading the cached result instead.
+On the first launch with a given mod list, DefLoadCache builds a cache of the fully-patched def tree. On subsequent launches with the same mod list, it skips reading thousands of XML files from disk and re-running thousands of XML patches, loading the cached result instead.
 
 Tested on a 576-mod load order: launch time reduced from ~14 minutes to ~8 minutes (45% faster). The mod XML loading and patch application pipeline specifically goes from ~6 minutes to ~23 seconds.
 
