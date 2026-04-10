@@ -128,6 +128,23 @@ namespace FluxxField.DefLoadCache
                 tooltip: "Clearing the cache forces RimWorld to do a full load on the next launch.");
 
             listing.Gap();
+
+            // --- Test without cache (one-launch skip) ---
+            if (listing.ButtonText("Test without cache (next launch only)",
+                "Temporarily disables the cache for one launch to help isolate issues. " +
+                "The cache is preserved — if the issue goes away, it was cache-related. " +
+                "If it persists, DefLoadCache is not involved."))
+            {
+                Settings.skipNextLaunch = true;
+                Messages.Message("DefLoadCache will skip the cache on next launch. Restart to test.",
+                    MessageTypeDefOf.TaskCompletion, false);
+            }
+            listing.Gap(4f);
+            listing.Label("  Use this to check if a bug you're experiencing is caused by\n" +
+                          "  DefLoadCache. The cache is kept — only one launch is affected.",
+                tooltip: "After one uncached launch, the cache is automatically re-enabled.");
+
+            listing.Gap();
             listing.GapLine();
             listing.Gap();
 
