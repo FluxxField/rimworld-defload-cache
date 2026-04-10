@@ -339,7 +339,16 @@ namespace FluxxField.DefLoadCache
                     metaSb.Append($"\"{kvp.Key.Replace("\"", "\\\"")}\":{kvp.Value}");
                     first = false;
                 }
-                metaSb.Append("}}");
+                metaSb.Append("},");
+                metaSb.Append("\"profileName\":null,");
+                metaSb.Append("\"modList\":[");
+                var mods = LoadedModManager.RunningModsListForReading;
+                for (int i = 0; i < mods.Count; i++)
+                {
+                    if (i > 0) metaSb.Append(',');
+                    metaSb.Append($"\"{mods[i].PackageId?.Replace("\"", "\\\"") ?? "<null>"}\"");
+                }
+                metaSb.Append("]}");
 
                 CacheStorage.Write(_currentFingerprint, bytes, metaSb.ToString());
                 sw.Stop();
