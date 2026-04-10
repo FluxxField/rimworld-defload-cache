@@ -61,7 +61,7 @@ namespace FluxxField.DefLoadCache
                 }
             }
 
-            Log.Message($"ModAttributionTagger: stamped {stamped} nodes, {missing} had no mod attribution");
+            Log.Message($"Stamped {stamped} defs with mod attribution ({missing} unattributed)");
         }
 
         /// <summary>
@@ -144,7 +144,7 @@ namespace FluxxField.DefLoadCache
                 }
             }
 
-            Log.Message($"ModAttributionTagger: stripped {stripped} cache attributes, rebuilt {rebuilt} assetlookup entries, {missingMod} packageIds not found in live load");
+            Log.Message($"Rebuilt {rebuilt} def attributions from cache ({missingMod} mods not found in live load)");
             return rebuilt;
         }
     }

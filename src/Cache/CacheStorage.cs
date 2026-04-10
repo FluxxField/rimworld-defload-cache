@@ -135,7 +135,7 @@ namespace FluxxField.DefLoadCache
 
                 File.WriteAllText(MetaPathForFingerprint(fingerprint), metaJson);
 
-                Log.Message($"cache written: {finalPath} ({bytes.Length / 1024} KB)");
+                Log.Message($"Cache file written ({bytes.Length / 1024} KB)");
 
                 Prune();
             }

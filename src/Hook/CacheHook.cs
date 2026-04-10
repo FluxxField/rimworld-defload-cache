@@ -59,31 +59,28 @@ namespace FluxxField.DefLoadCache
                 {
                     settings.skipNextLaunch = false;
                     try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] skipNextLaunch was set — running full uncached load this launch");
+                    Log.Message("skipNextLaunch was set — running full uncached load this launch");
                     return false;
                 }
 
                 if (settings != null && (!settings.cacheEnabled || !settings.skipModFileLoading))
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage G disabled in settings, running normally");
                     return false;
                 }
-
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] Stage G — LoadModXML entered");
 
                 var sw = Stopwatch.StartNew();
                 _currentFingerprint = ModlistFingerprint.Compute();
                 sw.Stop();
 
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] fingerprint = {_currentFingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
+                Log.Message($"Fingerprint computed in {sw.ElapsedMilliseconds}ms: {_currentFingerprint}");
 
                 if (CacheStorage.Exists(_currentFingerprint))
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] Stage G cache EXISTS — skipping LoadModXML file I/O");
+                    Log.Message("Cache found — skipping mod file loading");
                     return true;
                 }
 
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage G cache MISS — LoadModXML will run normally");
+                Log.Message("No cache found — loading mod files normally");
                 return false;
             }
             catch (Exception ex)
@@ -109,18 +106,16 @@ namespace FluxxField.DefLoadCache
                 // pipeline stopwatch, don't restart — just log entry.
                 if (_currentFingerprint != null)
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] hook fired — ApplyPatches entered (fingerprint already computed by Stage G)");
                     return;
                 }
 
                 _pipelineSw.Restart();
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] hook fired — Verse.LoadedModManager.ApplyPatches entered");
 
                 var sw = Stopwatch.StartNew();
                 _currentFingerprint = ModlistFingerprint.Compute();
                 sw.Stop();
 
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] fingerprint = {_currentFingerprint} (computed in {sw.ElapsedMilliseconds}ms)");
+                Log.Message($"Fingerprint computed in {sw.ElapsedMilliseconds}ms: {_currentFingerprint}");
             }
             catch (Exception ex)
             {
@@ -152,14 +147,13 @@ namespace FluxxField.DefLoadCache
                 var settings = DefLoadCacheMod.Settings;
                 if (settings != null && (!settings.cacheEnabled || !settings.skipPatchApplication))
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage D disabled in settings, running normally");
                     return false;
                 }
                 if (settings != null && settings.skipNextLaunch)
                 {
                     settings.skipNextLaunch = false;
                     try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] skipNextLaunch was set — running normal ApplyPatches");
+                    Log.Message("skipNextLaunch was set — running normal ApplyPatches");
                     return false;
                 }
                 if (_currentFingerprint == null)
@@ -175,7 +169,7 @@ namespace FluxxField.DefLoadCache
 
                 if (!CacheStorage.Exists(_currentFingerprint))
                 {
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache MISS — running normal ApplyPatches");
+                    Log.Message("Cache MISS — applying patches normally");
                     return false;
                 }
 
@@ -214,7 +208,7 @@ namespace FluxxField.DefLoadCache
                             packageIdToAsset[mod.PackageId] = asset;
                         }
                     }
-                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] built {packageIdToAsset.Count} synthetic LoadableXmlAssets for Stage G cache hit");
+                    Log.Message($"Built {packageIdToAsset.Count} mod asset mappings for cache hit");
                 }
 
                 // === POINT OF NO RETURN ===
@@ -244,7 +238,7 @@ namespace FluxxField.DefLoadCache
                 CacheValidator.Validate(_currentFingerprint!, actualCountsByMod);
 
                 sw.Stop();
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
+                Log.Message($"Cache HIT — loaded {rebuilt} defs from cache in {sw.ElapsedMilliseconds}ms");
 
                 CacheHitOccurred = true;
                 return true;
@@ -273,8 +267,8 @@ namespace FluxxField.DefLoadCache
         {
             if (CacheHitOccurred)
             {
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] ClearCachedPatches skipped — cache hit, patches were never executed");
                 _pipelineSw.Stop();
+                Log.Message($"Loading complete — total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
                 return true;
             }
             return false;
@@ -350,8 +344,8 @@ namespace FluxxField.DefLoadCache
                 CacheStorage.Write(_currentFingerprint, bytes, metaSb.ToString());
                 sw.Stop();
                 LastRunWasMiss = true;
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB, {totalNodeCount} nodes across {nodeCountsByMod.Count} mods)");
                 _pipelineSw.Stop();
+                Log.Message($"Cache saved — {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({bytes.Length / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {

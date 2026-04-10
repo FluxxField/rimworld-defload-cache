@@ -67,7 +67,7 @@ namespace FluxxField.DefLoadCache
             }
 
             File.WriteAllText(path, sb.ToString());
-            Log.Message($"Stage E diagnostic dump written: {path} ({lines.Count} defs)");
+            Log.Message($"Diagnostic dump written: {path} ({lines.Count} defs)");
         }
     }
 }
