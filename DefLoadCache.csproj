@@ -29,13 +29,13 @@
          runtime. Bundled Mono.Cecil and MonoMod.Utils types live inside this
          DLL as internal types; Krafs.Publicizer (below) publicizes them. -->
     <Reference Include="0Harmony">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0Harmony.dll</HintPath>
+      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
 
     <!-- Prepatcher's [FreePatch] attribute API -->
     <Reference Include="0PrepatcherAPI">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/3563469557/Assemblies/0PrepatcherAPI.dll</HintPath>
+      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies/0PrepatcherAPI.dll</HintPath>
       <Private>false</Private>
     </Reference>
 
