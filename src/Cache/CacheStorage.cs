@@ -35,6 +35,25 @@ namespace FluxxField.DefLoadCache
             return Path.Combine(CacheRoot, fingerprint + ".meta.json");
         }
 
+        /// <summary>
+        /// Reads the meta.json sidecar for a given fingerprint. Returns null
+        /// if the file doesn't exist or can't be read.
+        /// </summary>
+        public static string? ReadMeta(string fingerprint)
+        {
+            string p = MetaPathForFingerprint(fingerprint);
+            if (!File.Exists(p)) return null;
+            try
+            {
+                return File.ReadAllText(p);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"failed to read meta {p}", ex);
+                return null;
+            }
+        }
+
         public static bool TryRead(string fingerprint, out byte[]? bytes)
         {
             bytes = null;
