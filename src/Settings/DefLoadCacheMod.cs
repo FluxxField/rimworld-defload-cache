@@ -56,17 +56,6 @@ namespace FluxxField.DefLoadCache
                     "every patch.\n\n" +
                     "Disable this if you are developing or debugging XML patches.");
 
-                listing.Gap();
-
-                // --- Max cached profiles ---
-                Settings.maxCachedProfiles = (int)listing.SliderLabeled(
-                    $"Saved mod list profiles: {Settings.maxCachedProfiles}",
-                    Settings.maxCachedProfiles,
-                    1f, 20f,
-                    tooltip: "How many different mod list configurations to keep cached. " +
-                    "Each cache is about 7 MB. If you frequently switch between mod lists " +
-                    "(e.g. using RimPy profiles), increase this so each list stays cached. " +
-                    "Older caches are automatically deleted when the limit is reached.");
             }
 
             listing.Gap();
@@ -87,7 +76,7 @@ namespace FluxxField.DefLoadCache
                     try { totalBytes += new FileInfo(f).Length; } catch { }
                 }
                 listing.Label($"  Location: {cacheRoot}");
-                listing.Label($"  Cached profiles: {files.Length} / {Settings.maxCachedProfiles}");
+                listing.Label($"  Cached profiles: {files.Length}");
                 listing.Label($"  Disk usage: {totalBytes / 1024} KB ({totalBytes / 1024 / 1024} MB)");
             }
             else
