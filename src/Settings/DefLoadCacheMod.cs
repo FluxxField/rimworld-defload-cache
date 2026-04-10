@@ -32,7 +32,6 @@ namespace FluxxField.DefLoadCache
             {
                 listing.Gap();
 
-                // --- Skip mod file loading (Stage G) ---
                 listing.CheckboxLabeled(
                     "Skip reading mod files on repeat launches",
                     ref Settings.skipModFileLoading,
@@ -45,7 +44,6 @@ namespace FluxxField.DefLoadCache
 
                 listing.Gap();
 
-                // --- Skip patch application (Stage D) ---
                 listing.CheckboxLabeled(
                     "Skip applying XML patches on repeat launches",
                     ref Settings.skipPatchApplication,
@@ -55,7 +53,6 @@ namespace FluxxField.DefLoadCache
                     "launches use the cached post-patch result instead of re-running " +
                     "every patch.\n\n" +
                     "Disable this if you are developing or debugging XML patches.");
-
             }
 
             listing.Gap();
@@ -69,14 +66,41 @@ namespace FluxxField.DefLoadCache
             string cacheRoot = CacheStorage.CacheRoot;
             if (Directory.Exists(cacheRoot))
             {
-                var files = Directory.GetFiles(cacheRoot, "*.xml.gz");
+                var cacheFiles = Directory.GetFiles(cacheRoot, "*.xml.gz");
                 long totalBytes = 0;
-                foreach (var f in files)
+                var profileNames = new System.Collections.Generic.List<string>();
+                int untaggedCount = 0;
+
+                foreach (var f in cacheFiles)
                 {
                     try { totalBytes += new FileInfo(f).Length; } catch { }
+
+                    // Read profile name from meta
+                    string name = Path.GetFileName(f);
+                    if (name.EndsWith(".xml.gz"))
+                    {
+                        string fingerprint = name.Substring(0, name.Length - ".xml.gz".Length);
+                        string? meta = CacheStorage.ReadMeta(fingerprint);
+                        if (meta != null)
+                        {
+                            string? profile = CacheValidator.ParseString(meta, "profileName");
+                            if (profile != null)
+                                profileNames.Add(profile);
+                            else
+                                untaggedCount++;
+                        }
+                        else
+                        {
+                            untaggedCount++;
+                        }
+                    }
                 }
+
                 listing.Label($"  Location: {cacheRoot}");
-                listing.Label($"  Cached profiles: {files.Length}");
+                if (profileNames.Count > 0)
+                    listing.Label($"  Cached profiles: {profileNames.Count} ({string.Join(", ", profileNames)})");
+                if (untaggedCount > 0)
+                    listing.Label($"  Active list caches: {untaggedCount}");
                 listing.Label($"  Disk usage: {totalBytes / 1024} KB ({totalBytes / 1024 / 1024} MB)");
             }
             else
