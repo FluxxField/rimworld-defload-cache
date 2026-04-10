@@ -53,6 +53,16 @@ namespace FluxxField.DefLoadCache
                 _pipelineSw.Restart();
 
                 var settings = DefLoadCacheMod.Settings;
+
+                // One-shot skip: "Test without cache" button or validation failure
+                if (settings != null && settings.skipNextLaunch)
+                {
+                    settings.skipNextLaunch = false;
+                    try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] skipNextLaunch was set — running full uncached load this launch");
+                    return false;
+                }
+
                 if (settings != null && (!settings.cacheEnabled || !settings.skipModFileLoading))
                 {
                     Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage G disabled in settings, running normally");
@@ -143,6 +153,13 @@ namespace FluxxField.DefLoadCache
                 if (settings != null && (!settings.cacheEnabled || !settings.skipPatchApplication))
                 {
                     Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] Stage D disabled in settings, running normally");
+                    return false;
+                }
+                if (settings != null && settings.skipNextLaunch)
+                {
+                    settings.skipNextLaunch = false;
+                    try { LoadedModManager.GetMod<DefLoadCacheMod>()?.WriteSettings(); } catch { }
+                    Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] skipNextLaunch was set — running normal ApplyPatches");
                     return false;
                 }
                 if (_currentFingerprint == null)
