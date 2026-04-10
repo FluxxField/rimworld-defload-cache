@@ -223,6 +223,9 @@ namespace FluxxField.DefLoadCache
                 assetlookup.Clear();
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out var actualCountsByMod);
 
+                // Validate node counts against baseline in meta.json
+                CacheValidator.Validate(xmlDoc, _currentFingerprint!, actualCountsByMod);
+
                 sw.Stop();
                 Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
 
