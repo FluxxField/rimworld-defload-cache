@@ -87,21 +87,19 @@ namespace FluxxField.DefLoadCache
 
         /// <summary>
         /// Rebuilds the assetlookup dictionary from the data-defloadcache-mod
-        /// attributes embedded on top-level def nodes during caching. Used by
-        /// TryLoadCached on cache hit to reproduce the mod-attribution state
-        /// that CombineIntoUnifiedXML would have built during a normal load.
+        /// attributes embedded on top-level def nodes during caching. Also
+        /// populates countsByMod with per-packageId node counts for post-load
+        /// validation (counts are collected before attributes are stripped).
         ///
-        /// Reuses REAL LoadableXmlAsset instances from the original assetlookup
-        /// parameter (passed in BEFORE the doc is mutated). We can't construct
-        /// synthetic LoadableXmlAssets because its fields are readonly. So we
-        /// walk the existing lookup first to build a packageId → LoadableXmlAsset
-        /// map, then after the doc is replaced, look up each new node's
-        /// LoadableXmlAsset by its attribute.
-        ///
-        /// Returns the count of successfully-mapped nodes.
+        /// Returns the count of successfully-mapped assetlookup entries.
         /// </summary>
-        public static int RebuildAssetLookup(XmlDocument doc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup, Dictionary<string, LoadableXmlAsset> packageIdToAsset)
+        public static int RebuildAssetLookup(
+            XmlDocument doc,
+            Dictionary<XmlNode, LoadableXmlAsset> assetlookup,
+            Dictionary<string, LoadableXmlAsset> packageIdToAsset,
+            out Dictionary<string, int> countsByMod)
         {
+            countsByMod = new Dictionary<string, int>();
             if (doc?.DocumentElement == null) return 0;
 
             int rebuilt = 0;
@@ -115,10 +113,16 @@ namespace FluxxField.DefLoadCache
 
                 string packageId = element.GetAttribute(AttributeName);
 
+                // Count before stripping — this feeds CacheValidator
+                if (!string.IsNullOrEmpty(packageId))
+                {
+                    if (countsByMod.ContainsKey(packageId))
+                        countsByMod[packageId]++;
+                    else
+                        countsByMod[packageId] = 1;
+                }
+
                 // Strip our cache attribute so it doesn't pollute the live doc
-                // that ParseAndProcessXML will read. RimWorld's DirectXmlToObject
-                // generally ignores unknown attributes but removing ours is
-                // strictly safer.
                 if (!string.IsNullOrEmpty(packageId))
                 {
                     element.RemoveAttribute(AttributeName);
