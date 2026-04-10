@@ -43,12 +43,12 @@ Tested on a 576-mod Combat Extended milsim load order:
 
 ## Requirements
 
-- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=3563469557)** — required dependency. DefLoadCache uses Prepatcher's `[FreePatch]` system to inject IL into the mod loading pipeline.
+- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** — required dependency. DefLoadCache uses Prepatcher's `[FreePatch]` system to inject IL into the mod loading pipeline.
 - **RimWorld 1.6**
 
 ## Installation
 
-1. Install [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=3563469557) from Steam Workshop
+1. Install [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800) from Steam Workshop
 2. Install DefLoadCache
 3. Place DefLoadCache anywhere in your mod list (after Prepatcher and Harmony)
 4. Launch RimWorld — the first launch builds the cache (normal speed), subsequent launches are faster
@@ -62,11 +62,12 @@ Access via **Options > Mod Settings > DefLoadCache**:
 - **Skip applying XML patches on repeat launches** — controls whether the cached post-patch def tree is used. Disable if you're developing/debugging XML patches.
 - **Saved mod list profiles** — how many different mod list caches to keep (default 10). Useful if you switch between multiple mod lists using RimPy.
 - **Clear all cached data** — deletes all cache files. Next launch will rebuild from scratch.
+- **Test without cache (next launch only)** — temporarily disables the cache for one launch to help isolate issues. The cache is preserved. If the issue goes away, it was cache-related. If it persists, DefLoadCache is not involved. Automatically re-enables after one launch.
 - **Write diagnostic snapshot** — developer tool for verifying cache correctness.
 
 ## How It Works
 
-DefLoadCache uses [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=3563469557)'s `[FreePatch]` API to inject IL instructions into RimWorld's mod loading pipeline at compile time (before the CLR verifies `Assembly-CSharp.dll`). This allows intercepting methods that are normally inaccessible to Harmony.
+DefLoadCache uses [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)'s `[FreePatch]` API to inject IL instructions into RimWorld's mod loading pipeline at compile time (before the CLR verifies `Assembly-CSharp.dll`). This allows intercepting methods that are normally inaccessible to Harmony.
 
 ### Cache Pipeline
 
@@ -95,16 +96,44 @@ Any change to any file — including same-size content edits (e.g., changing `co
 
 Any change to any of these causes a cache miss and full rebuild.
 
-### Safety
+### Safety & Self-Validation
 
-- Every public entry point is wrapped in `try/catch` — if anything throws, the game falls back to normal loading
-- If the cached document is corrupted mid-load (after the point of no return), the error is logged and rethrown rather than silently producing bad state
-- Corrupt cache files are automatically deleted
-- The mod can be disabled at any time with zero side effects
+DefLoadCache is designed to never cause problems for other mods. If something goes wrong, it catches itself:
+
+- **Post-load validation** — on every cache hit, the mod compares per-mod def counts against the baseline stored when the cache was built. If any counts don't match, the bad cache is automatically deleted and the next launch runs uncached.
+- **Self-healing** — a bad cache never survives two launches. Validation failure triggers automatic cache deletion and forces a clean uncached load on the next restart.
+- **First-error notice** — if any error occurs in the log during a cache-hit launch, DefLoadCache emits a notice reminding the player to test without the cache before filing bug reports on other mods.
+- **Structured status block** — every launch emits a clearly delimited block in the log showing cache state, validation result, and troubleshooting guidance. Modders reviewing player logs can instantly see whether DefLoadCache was involved.
+- **Fail-safe error handling** — every public entry point is wrapped in `try/catch`. If anything throws, the game falls back to normal loading.
+- **Point-of-no-return detection** — if the cached document is corrupted mid-load (after the XML doc has been mutated), the error is logged and rethrown rather than silently producing bad state.
+- **Corrupt cache cleanup** — cache files that fail to deserialize are automatically deleted.
+- **Zero side effects** — the mod can be disabled at any time with no impact on other mods.
+
+### For Mod Authors
+
+If a player files a bug report with DefLoadCache installed, search their log for `DefLoadCache Status`. You'll see:
+
+```
+[DefLoadCache] ══════════════════════════════════════════════════
+[DefLoadCache]   DefLoadCache Status
+[DefLoadCache]   Result:      Cache HIT
+[DefLoadCache]   Fingerprint: abc123...
+[DefLoadCache]   Cache built: 2026-04-10 15:57 UTC
+[DefLoadCache]   Defs loaded: 16,439 (expected: 16,439 ✓)
+[DefLoadCache]   Validation:  PASSED
+[DefLoadCache]
+[DefLoadCache]   If you are filing a bug report for another mod,
+[DefLoadCache]   please test with DefLoadCache disabled first.
+[DefLoadCache]   Mod Settings → DefLoadCache → "Test without
+[DefLoadCache]   cache (next launch only)", then restart.
+[DefLoadCache] ══════════════════════════════════════════════════
+```
+
+If validation shows PASSED, DefLoadCache served the correct data. If there's any doubt, ask the player to click "Test without cache (next launch only)" in mod settings and reproduce the issue.
 
 ## Correctness Verification
 
-DefLoadCache includes a built-in diagnostic dump tool (Stage E). When enabled in settings, it writes a sorted snapshot of every loaded def (type, defName, mod, label) to a text file. Running this on both a cache-miss and cache-hit launch produces identical output (55,241 defs verified on a 576-mod list).
+DefLoadCache includes a built-in diagnostic dump tool. When enabled in settings, it writes a sorted snapshot of every loaded def (type, defName, mod, label) to a text file. Running this on both a cache-miss and cache-hit launch produces identical output (55,241 defs verified on a 576-mod list).
 
 ## Building from Source
 
@@ -150,6 +179,6 @@ MIT
 ## Credits
 
 - **FluxxField** — author
-- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=3563469557)** by jikulopo — the `[FreePatch]` IL injection system that makes this possible
+- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** by Zetrith — the `[FreePatch]` IL injection system that makes this possible. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
 - **[Krafs.Publicizer](https://github.com/krafs/Publicizer)** — compile-time publicizer for accessing internal Cecil types
 - **[Performance Fish](https://github.com/bbradson/Performance-Fish)** by bbradson — inspiration for the Publicizer + HintPath pattern
