@@ -25,7 +25,7 @@ namespace FluxxField.DefLoadCache
         /// Bump this when the cache format changes. All caches with a different
         /// version are invalidated.
         /// </summary>
-        public const int CacheFormatVersion = 3;
+        public const int CacheFormatVersion = 4;
 
         internal static string Compute()
         {
