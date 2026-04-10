@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using System.Xml;
 using Verse;
 
 namespace FluxxField.DefLoadCache
@@ -29,7 +28,6 @@ namespace FluxxField.DefLoadCache
         /// (doc is already mutated) but the bad cache is cleaned up.
         /// </summary>
         internal static bool Validate(
-            XmlDocument doc,
             string fingerprint,
             Dictionary<string, int> actualCountsByMod)
         {

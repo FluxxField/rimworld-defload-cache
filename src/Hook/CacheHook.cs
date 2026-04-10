@@ -241,7 +241,7 @@ namespace FluxxField.DefLoadCache
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out var actualCountsByMod);
 
                 // Validate node counts against baseline in meta.json
-                CacheValidator.Validate(xmlDoc, _currentFingerprint!, actualCountsByMod);
+                CacheValidator.Validate(_currentFingerprint!, actualCountsByMod);
 
                 sw.Stop();
                 Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] cache HIT — deserialized + populated in {sw.ElapsedMilliseconds}ms, {rebuilt} assetlookup entries rebuilt. Skipping original ApplyPatches body.");
@@ -406,7 +406,7 @@ namespace FluxxField.DefLoadCache
 
                 string packageId = element.GetAttribute(ModAttributionTagger.AttributeName);
                 if (string.IsNullOrEmpty(packageId))
-                    packageId = "<unattributed>";
+                    continue; // Skip unattributed nodes — RebuildAssetLookup also skips them
 
                 if (counts.ContainsKey(packageId))
                     counts[packageId]++;
