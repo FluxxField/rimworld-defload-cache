@@ -17,10 +17,16 @@ Features:
 - Automatic cache invalidation when mods, RimWorld version, or DLLs change
 - Support for multiple mod list profiles (switch between RimPy profiles without losing caches)
 - Configurable settings with per-feature toggles
-- Safe fallback: if anything goes wrong, the game loads normally
 - Zero gameplay impact: only affects load time
 
-Requires Prepatcher.</description>
+Safety:
+- Post-load validation verifies cached data against baseline on every launch
+- Self-healing: bad caches are automatically deleted and rebuilt
+- One-click "Test without cache" button for isolating issues
+- Structured log output for modders reviewing player bug reports
+- Safe fallback: if anything goes wrong, the game loads normally
+
+Requires Prepatcher by Zetrith.</description>
   <modDependencies>
     <li>
       <packageId>zetrith.prepatcher</packageId>
