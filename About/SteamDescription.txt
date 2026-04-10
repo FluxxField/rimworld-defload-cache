@@ -107,4 +107,13 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list. There's more coming.
 [*] Prepatcher-based runtime profiler with per-mod attribution. See which mods are costing you the most FPS with a live "top 10 mods by tick cost" overlay.
 [/list]
 
+[h2]Credits[/h2]
+[list]
+[*] [b]FluxxField.[/b] Author
+[*] [b][url=https://steamcommunity.com/workshop/filedetails/?id=2009463077]Harmony[/url][/b] by pardeike. The patching library that Prepatcher and most RimWorld mods are built on.
+[*] [b][url=https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800]Prepatcher[/url][/b] by Zetrith. The [FreePatch] IL injection system that makes this possible. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
+[*] [b][url=https://github.com/krafs/Publicizer]Krafs.Publicizer[/url].[/b] Compile-time publicizer for accessing internal Cecil types.
+[*] [b][url=https://github.com/bbradson/Performance-Fish]Performance Fish[/url][/b] by bbradson. Inspiration for the Publicizer + HintPath pattern.
+[/list]
+
 Have ideas or want to contribute? Check the [url=https://github.com/FluxxField/rimworld-defload-cache]source on GitHub[/url].

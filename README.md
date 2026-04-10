@@ -180,6 +180,7 @@ MIT
 ## Credits
 
 - **FluxxField.** Author
+- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077)** by pardeike. The patching library that Prepatcher and most RimWorld mods are built on.
 - **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** by Zetrith. The `[FreePatch]` IL injection system that makes this possible. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
 - **[Krafs.Publicizer](https://github.com/krafs/Publicizer).** Compile-time publicizer for accessing internal Cecil types
 - **[Performance Fish](https://github.com/bbradson/Performance-Fish)** by bbradson. Inspiration for the Publicizer + HintPath pattern
