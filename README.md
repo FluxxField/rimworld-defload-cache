@@ -158,6 +158,7 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loa
 
 ### Near-term improvements
 - ~~**Content-aware fingerprinting**~~ — **Done!** The fingerprint now includes file modification timestamps. Same-size content changes invalidate the cache automatically.
+- **Per-file content checksums** — maintain a persistent map of file path → mtime + content checksum. Only recompute checksums when a file's mtime changes. If Steam re-downloads a mod but the content is byte-for-byte identical, the checksum stays the same and the cache survives. This improves cache hit rates on large modlists where workshop mods get frequent metadata-only updates.
 - **Binary cache format** — replace gzipped XML with a compact binary format (MessagePack or similar) for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
 - **Parallel fingerprint hashing** — fingerprint computation is already parallelized across mods, but individual About.xml reads could be further optimized or eliminated.
 - **`ErrorCheckPatches` skip on cache hit** — the 7.6 second gap between LoadModXML skip and ApplyPatches entry includes patch config validation that's unnecessary on cached launches.
