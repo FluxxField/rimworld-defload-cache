@@ -36,9 +36,9 @@ namespace FluxxField.DefLoadCache
 
             if (CacheHook.CacheHitOccurred)
             {
-                result = "Cache HIT";
+                string? profileName = null;
 
-                // Read timestamp from meta.json
+                // Read timestamp and profile name from meta.json
                 if (CacheHook.CurrentFingerprint != null)
                 {
                     string? meta = CacheStorage.ReadMeta(CacheHook.CurrentFingerprint);
@@ -58,8 +58,14 @@ namespace FluxxField.DefLoadCache
                                 cacheBuilt = ts;
                             }
                         }
+
+                        profileName = CacheValidator.ParseString(meta, "profileName");
                     }
                 }
+
+                result = profileName != null
+                    ? $"Cache HIT (profile: {profileName})"
+                    : "Cache HIT";
 
                 // Validation result
                 if (CacheValidator.LastValidationPassed == true)
