@@ -9,6 +9,7 @@ namespace FluxxField.DefLoadCache
         public bool skipPatchApplication = true;
         public int maxCachedProfiles = 10;
         public bool diagnosticDumpEnabled = false;
+        public bool skipNextLaunch = false;
 
         public override void ExposeData()
         {
@@ -17,6 +18,7 @@ namespace FluxxField.DefLoadCache
             Scribe_Values.Look(ref skipPatchApplication, "skipPatchApplication", true);
             Scribe_Values.Look(ref maxCachedProfiles, "maxCachedProfiles", 10);
             Scribe_Values.Look(ref diagnosticDumpEnabled, "diagnosticDumpEnabled", false);
+            Scribe_Values.Look(ref skipNextLaunch, "skipNextLaunch", false);
             base.ExposeData();
         }
     }
