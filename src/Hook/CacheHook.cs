@@ -298,21 +298,39 @@ namespace FluxxField.DefLoadCache
 
                 var sw = Stopwatch.StartNew();
                 ModAttributionTagger.StampAttributions(xmlDoc, assetlookup);
+
+                // Collect per-mod node counts from the attributed doc for validation
+                var nodeCountsByMod = CountNodesByMod(xmlDoc);
+                int totalNodeCount = 0;
+                foreach (var kvp in nodeCountsByMod)
+                    totalNodeCount += kvp.Value;
+
                 byte[] bytes = CacheFormat.Serialize(xmlDoc);
                 ModAttributionTagger.UnstampAttributions(xmlDoc);
 
-                string metaJson = "{"
-                    + $"\"timestamp\":\"{DateTime.UtcNow:o}\","
-                    + $"\"modCount\":{LoadedModManager.RunningModsListForReading.Count},"
-                    + $"\"rimworldVersion\":\"{RimWorld.VersionControl.CurrentVersionString}\","
-                    + $"\"cacheFormatVersion\":{ModlistFingerprint.CacheFormatVersion},"
-                    + $"\"sizeBytes\":{bytes.Length}"
-                    + "}";
+                // Build meta.json with node counts for post-load validation
+                var metaSb = new System.Text.StringBuilder();
+                metaSb.Append("{");
+                metaSb.Append($"\"timestamp\":\"{DateTime.UtcNow:o}\",");
+                metaSb.Append($"\"modCount\":{LoadedModManager.RunningModsListForReading.Count},");
+                metaSb.Append($"\"rimworldVersion\":\"{RimWorld.VersionControl.CurrentVersionString}\",");
+                metaSb.Append($"\"cacheFormatVersion\":{ModlistFingerprint.CacheFormatVersion},");
+                metaSb.Append($"\"sizeBytes\":{bytes.Length},");
+                metaSb.Append($"\"totalNodeCount\":{totalNodeCount},");
+                metaSb.Append("\"nodeCountsByMod\":{");
+                bool first = true;
+                foreach (var kvp in nodeCountsByMod)
+                {
+                    if (!first) metaSb.Append(',');
+                    metaSb.Append($"\"{kvp.Key.Replace("\"", "\\\"")}\":{kvp.Value}");
+                    first = false;
+                }
+                metaSb.Append("}}");
 
-                CacheStorage.Write(_currentFingerprint, bytes, metaJson);
+                CacheStorage.Write(_currentFingerprint, bytes, metaSb.ToString());
                 sw.Stop();
                 LastRunWasMiss = true;
-                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB)");
+                Log.Message($"[T+{_pipelineSw.ElapsedMilliseconds}ms] [{DateTime.Now:HH:mm:ss.fff}] SaveToCache: stamped + serialized + wrote in {sw.ElapsedMilliseconds}ms ({bytes.Length / 1024} KB, {totalNodeCount} nodes across {nodeCountsByMod.Count} mods)");
                 _pipelineSw.Stop();
             }
             catch (Exception ex)
@@ -350,6 +368,33 @@ namespace FluxxField.DefLoadCache
                 Log.Error($"CreateSyntheticAsset failed for {mod.PackageId}", ex);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Counts top-level element nodes per mod packageId from a doc that has
+        /// already been stamped with data-defloadcache-mod attributes.
+        /// </summary>
+        private static Dictionary<string, int> CountNodesByMod(XmlDocument doc)
+        {
+            var counts = new Dictionary<string, int>();
+            if (doc?.DocumentElement == null) return counts;
+
+            foreach (XmlNode node in doc.DocumentElement.ChildNodes)
+            {
+                if (node.NodeType != XmlNodeType.Element) continue;
+                if (!(node is XmlElement element)) continue;
+
+                string packageId = element.GetAttribute(ModAttributionTagger.AttributeName);
+                if (string.IsNullOrEmpty(packageId))
+                    packageId = "<unattributed>";
+
+                if (counts.ContainsKey(packageId))
+                    counts[packageId]++;
+                else
+                    counts[packageId] = 1;
+            }
+
+            return counts;
         }
     }
 }
