@@ -158,20 +158,40 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loa
 
 ### Near-term improvements
 - ~~**Content-aware fingerprinting.**~~ **Done!** The fingerprint now includes file modification timestamps. Same-size content changes invalidate the cache automatically.
-- **Per-file content checksums.** Maintain a persistent map of file path → mtime + content checksum. Only recompute checksums when a file's mtime changes. If Steam re-downloads a mod but the content is byte-for-byte identical, the checksum stays the same and the cache survives. This improves cache hit rates on large modlists where workshop mods get frequent metadata-only updates.
-- **Binary cache format.** Replace gzipped XML with a compact binary format (MessagePack or similar) for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
-- **Parallel fingerprint hashing.** Fingerprint computation is already parallelized across mods, but individual About.xml reads could be further optimized or eliminated.
-- **`ErrorCheckPatches` skip on cache hit.** The 7.6 second gap between LoadModXML skip and ApplyPatches entry includes patch config validation that's unnecessary on cached launches.
+- ~~**Post-load validation and self-healing.**~~ **Done!** The cache validates itself on every launch and automatically deletes bad caches.
+- ~~**Profile-aware cache pruning.**~~ **Done!** Caches are matched to saved mod list profiles. Tweaking a list replaces the old cache instead of creating duplicates.
+- **Per-file content checksums.** Maintain a persistent map of file path → mtime + content checksum. Only recompute checksums when a file's mtime changes. If Steam re-downloads a mod but the content is byte-for-byte identical, the checksum stays the same and the cache survives. Improves cache hit rates on large modlists where workshop mods get frequent metadata-only updates.
+- **`ErrorCheckPatches` skip on cache hit.** The 7.6 second gap between LoadModXML skip and ApplyPatches entry includes patch config validation that's unnecessary on cached launches. ~7 seconds saved, low complexity.
+- **Binary cache format.** Replace gzipped XML with a compact binary format for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
 
-### Potential future features
-- **Deferred texture loading.** Load textures in background threads while the user is at the main menu instead of blocking startup. Textures not needed until gameplay could be loaded on-demand, saving ~2-3 minutes of startup time.
-- **Cached parsed Def objects (Tier 2).** Skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires careful Harmony patch invalidation tracking.
-- **Prepatcher-based profiler with mod attribution.** A runtime profiler that uses Cecil to instrument Harmony-patched methods and attribute per-tick cost to specific mods. "Top 10 mods by tick cost" with drill-down to specific methods. Directly reuses the Prepatcher + Cecil infrastructure from DefLoadCache.
-- **Incremental patching.** On mod list changes where only new patches are added (none removed/modified), apply only the new patches to the cached doc instead of re-running everything.
+### Phase 2: Checkpoint-based incremental rebuild
+
+The big one. Instead of rebuilding the entire cache when any mod changes, store intermediate checkpoints along the load order. When a mod is added, removed, or updated, find the latest valid checkpoint and replay patches from there.
+
+This is the same approach compilers use for incremental builds. The current single-cache design is a special case where N=1 checkpoint.
+
+**Implementation roadmap (each step ships independently):**
+1. **Per-mod fingerprints.** Split the modlist fingerprint into individual per-mod hashes. No behavior change, just restructuring for the next steps.
+2. **Single early checkpoint after Core+DLCs.** Validates the checkpoint mechanism with minimal complexity. Core and DLCs rarely change, so this checkpoint is almost always valid.
+3. **N checkpoints + incremental replay.** ~10 checkpoints spaced across the load order. On mod changes, walk the load order to find where it diverges, load the latest valid checkpoint, replay from there.
+
+**What this enables:**
+- Add a mod at the end of load order: replay 1 mod's patches instead of all 500+
+- Update a mod in the middle: replay from that point forward, not from scratch
+- Remove a mod: replay from that point forward without it
+- Daily Steam Workshop updates no longer invalidate the whole cache
+
+### Other potential features
+- **Cached parsed Def objects.** Skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires serializing arbitrary C# objects with cross-references. Research-level complexity.
+- **Prepatcher-based profiler with mod attribution.** A runtime profiler that uses Cecil to instrument Harmony-patched methods and attribute per-tick cost to specific mods. Reuses the Prepatcher + Cecil infrastructure from DefLoadCache.
+
+### Compatibility notes
+
+Texture and image loading optimization is handled well by existing mods like [Faster Game Loading](https://steamcommunity.com/sharedfiles/filedetails/?id=3652938473) and [Image Opt](https://steamcommunity.com/sharedfiles/filedetails/?id=3543873568). DefLoadCache focuses on the XML loading and patch application pipeline, which is complementary.
 
 ### The bigger vision
 
-RimWorld mod loading is structurally identical to a compiler pipeline: source files (mod XML) are parsed, merged, transformed (patches), and compiled into runtime objects (DefDatabase). DefLoadCache is Phase 1 of a broader **modlist compiler** project, caching the intermediate representation. Future phases would add profiling, static analysis, and optimization passes using the same Prepatcher + Cecil foundation.
+RimWorld mod loading is structurally identical to a compiler pipeline: source files (mod XML) are parsed, merged, transformed (patches), and compiled into runtime objects (DefDatabase). DefLoadCache is building toward a full **modlist compiler** with incremental rebuilds, caching, and validation, using the same techniques that make modern build systems fast.
 
 ## License
 
