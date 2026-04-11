@@ -171,9 +171,10 @@ The big one. Instead of rebuilding the entire cache when any mod changes, store 
 This is the same approach compilers use for incremental builds. The current single-cache design is a special case where N=1 checkpoint.
 
 **Implementation roadmap (each step ships independently):**
-1. **Per-mod fingerprints.** Split the modlist fingerprint into individual per-mod hashes. No behavior change, just restructuring for the next steps.
-2. **Single early checkpoint after Core+DLCs.** Validates the checkpoint mechanism with minimal complexity. Core and DLCs rarely change, so this checkpoint is almost always valid.
-3. **N checkpoints + incremental replay.** ~10 checkpoints spaced across the load order. On mod changes, walk the load order to find where it diverges, load the latest valid checkpoint, replay from there.
+1. **PatchOperation safety audit.** Before building any of this, audit every PatchOperation subclass (vanilla and modded) to determine which are pure functions of the document. Vanilla ops are safe. Custom mod ops need IL analysis to verify they don't read the filesystem, use randomness, or depend on runtime state. This audit gates the entire feature.
+2. **Per-mod fingerprints.** Split the modlist fingerprint into individual per-mod hashes. No behavior change, just restructuring for the next steps.
+3. **Single early checkpoint after Core+DLCs.** Validates the checkpoint mechanism with minimal complexity. Core and DLCs rarely change, so this checkpoint is almost always valid.
+4. **N checkpoints + incremental replay.** ~10 checkpoints spaced across the load order. On mod changes, walk the load order to find where it diverges, load the latest valid checkpoint, replay from there. Mods with unsafe custom PatchOperations act as checkpoint barriers, with safe mods checkpointed past them.
 
 **What this enables:**
 - Add a mod at the end of load order: replay 1 mod's patches instead of all 500+
