@@ -79,10 +79,47 @@ namespace FluxxField.DefLoadCache
                 if (TryLoadCached(xmlDoc, assetlookup))
                     return;
 
-                // Cache miss: apply patches per-mod (same behavior as vanilla's
-                // SelectMany loop, but with per-mod boundaries for future checkpoints)
+                // Cache miss: apply patches per-mod
                 var mods = LoadedModManager.RunningModsListForReading;
-                for (int i = 0; i < mods.Count; i++)
+                int startFrom = 0;
+
+                // Experimental: try to resume from a checkpoint
+                List<(string packageId, string hash)>? perModHashes = null;
+                if (DefLoadCacheSettings.ExperimentalEnabled)
+                {
+                    perModHashes = ModlistFingerprint.ComputePerModHashes();
+                    int checkpointIndex = CheckpointStorage.FindLatestValidCheckpoint(perModHashes);
+                    if (checkpointIndex >= 0)
+                    {
+                        if (CheckpointStorage.LoadCheckpoint(xmlDoc, checkpointIndex))
+                        {
+                            // Rebuild assetlookup from the checkpoint's embedded
+                            // attribution stamps, same way TryLoadCached does it
+                            var packageIdToAsset = new Dictionary<string, LoadableXmlAsset>();
+                            foreach (var mod in mods)
+                            {
+                                if (mod?.PackageId == null) continue;
+                                var asset = CreateSyntheticAsset(mod);
+                                if (asset != null && !packageIdToAsset.ContainsKey(mod.PackageId))
+                                    packageIdToAsset[mod.PackageId] = asset;
+                            }
+                            assetlookup.Clear();
+                            ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out _);
+
+                            startFrom = checkpointIndex + 1;
+                            Log.Message($"Loaded checkpoint at mod index {checkpointIndex} ({mods[checkpointIndex].PackageId}), replaying from index {startFrom} ({mods.Count - startFrom} mods to replay)");
+                        }
+                    }
+
+                    if (startFrom == 0)
+                    {
+                        // No valid checkpoint, clear old ones since we're doing a full rebuild
+                        CheckpointStorage.ClearAll();
+                    }
+                }
+
+                // Apply patches from startFrom onward
+                for (int i = startFrom; i < mods.Count; i++)
                 {
                     var mod = mods[i];
                     foreach (var patch in mod.Patches)
@@ -94,6 +131,24 @@ namespace FluxxField.DefLoadCache
                         catch (System.Exception ex)
                         {
                             Verse.Log.Error("Error in patch.Apply(): " + ex);
+                        }
+                    }
+
+                    // Experimental: save checkpoints at intervals
+                    if (DefLoadCacheSettings.ExperimentalEnabled && perModHashes != null)
+                    {
+                        // Checkpoint after Core+DLCs (first ~4 mods), then every 50 mods
+                        bool isCoreDlcBoundary = i < 10 && i + 1 < mods.Count
+                            && !mods[i + 1].PackageId.StartsWith("ludeon.");
+                        bool isInterval = (i + 1) % 50 == 0;
+
+                        if (isCoreDlcBoundary || isInterval)
+                        {
+                            // Stamp attribution into checkpoint so we can rebuild
+                            // the assetlookup when loading it later
+                            ModAttributionTagger.StampAttributions(xmlDoc, assetlookup);
+                            CheckpointStorage.SaveCheckpoint(xmlDoc, i, perModHashes);
+                            ModAttributionTagger.UnstampAttributions(xmlDoc);
                         }
                     }
                 }
