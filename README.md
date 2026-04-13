@@ -201,6 +201,7 @@ MIT
 ## Credits
 
 - **FluxxField.** Author
+- **[CriDos](https://github.com/CriDos/rimworld-defload-cache)** (Maxim G.) Per-file fingerprinting, streaming hash, and ErrorCheckPatches skip.
 - **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077)** by Brrainz. The patching library that Prepatcher and most RimWorld mods are built on.
 - **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** by Zetrith. The `[FreePatch]` IL injection system that makes this possible. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
 - **[Krafs.Publicizer](https://github.com/krafs/Publicizer).** Compile-time publicizer for accessing internal Cecil types
