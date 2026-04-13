@@ -174,6 +174,37 @@ namespace FluxxField.DefLoadCache
                 "Files are saved in the cache folder as diagnostic-cache-hit.txt " +
                 "and diagnostic-cache-miss.txt.");
 
+            if (DefLoadCacheSettings.ExperimentalEnabled)
+            {
+                listing.Gap();
+                listing.GapLine();
+                listing.Gap();
+
+                listing.Label("Experimental Features",
+                    tooltip: "These features are under active development and may not be stable. " +
+                    "Use at your own risk.");
+                listing.Gap(4f);
+
+                listing.CheckboxLabeled(
+                    "Include mod settings in fingerprint",
+                    ref Settings.includeModSettingsInFingerprint,
+                    "Include each mod's settings file in the cache fingerprint. " +
+                    "This ensures the cache is invalidated when you change mod settings " +
+                    "that affect XML patching (e.g., VEF toggles, Tweaks Galore options).\n\n" +
+                    "Without this, changing a mod setting that affects patches requires " +
+                    "manually clearing the cache.");
+
+                listing.Gap();
+
+                listing.CheckboxLabeled(
+                    "Per-mod fingerprint hashing",
+                    ref Settings.perModHashing,
+                    "Compute and store a separate fingerprint hash for each mod instead of " +
+                    "one combined hash. This is the foundation for future incremental " +
+                    "rebuild support where only changed mods trigger a partial cache rebuild.\n\n" +
+                    "No behavior change yet, just stores extra data for future use.");
+            }
+
             listing.End();
         }
     }
