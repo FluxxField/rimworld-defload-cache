@@ -141,7 +141,6 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public static bool TryLoadCached(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
-            bool docMutated = false;
             try
             {
                 var settings = DefLoadCacheMod.Settings;
@@ -211,15 +210,11 @@ namespace FluxxField.DefLoadCache
                     Log.Message($"Built {packageIdToAsset.Count} mod asset mappings for cache hit");
                 }
 
-                // === POINT OF NO RETURN ===
-                // xmlDoc.Load() replaces all content. If anything throws
-                // after this point, the caller's xmlDoc is in a corrupt
-                // state. Returning false would let the original ApplyPatches
-                // body run on garbage. The catch block detects this via
-                // docMutated and rethrows.
-                //
-                // Stream directly from file → gzip → xmlDoc.Load to avoid
-                // creating a second XmlDocument and deep-copying 45k+ nodes.
+                // Load into a temporary doc first. If deserialization fails
+                // (corrupt cache, wrong format, etc.), the caller's xmlDoc is
+                // untouched and we fall back to normal loading. No more
+                // "point of no return" crash scenario.
+                XmlDocument cachedDoc;
                 using (var stream = CacheStorage.OpenReadStream(_currentFingerprint))
                 {
                     if (stream == null)
@@ -227,9 +222,19 @@ namespace FluxxField.DefLoadCache
                         Log.Warning("TryLoadCached: cache file vanished between Exists and OpenReadStream");
                         return false;
                     }
-                    docMutated = true;
-                    CacheFormat.LoadInto(xmlDoc, stream);
+                    cachedDoc = new XmlDocument();
+                    CacheFormat.LoadInto(cachedDoc, stream);
                 }
+
+                // Deserialization succeeded. Swap the document element into the
+                // caller's doc. ImportNode with deep=true copies the tree, then
+                // we release the temp doc so the GC can reclaim it promptly.
+                xmlDoc.RemoveAll();
+                if (cachedDoc.DocumentElement != null)
+                {
+                    xmlDoc.AppendChild(xmlDoc.ImportNode(cachedDoc.DocumentElement, true));
+                }
+                cachedDoc = null!; // Release for GC before we do more work
 
                 assetlookup.Clear();
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out var actualCountsByMod);
@@ -245,11 +250,6 @@ namespace FluxxField.DefLoadCache
             }
             catch (Exception ex) when (!(ex is OutOfMemoryException))
             {
-                if (docMutated)
-                {
-                    Log.Error("TryLoadCached threw AFTER xmlDoc was already mutated. Cannot recover, rethrowing.", ex);
-                    throw;
-                }
                 Log.Error("TryLoadCached threw, falling through to normal ApplyPatches", ex);
                 return false;
             }
@@ -307,13 +307,21 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public static bool ShouldSkipClearPatches()
         {
-            if (CacheHitOccurred)
+            try
             {
-                _pipelineSw.Stop();
-                Log.Message($"Loading complete, total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
-                return true;
+                if (CacheHitOccurred)
+                {
+                    _pipelineSw.Stop();
+                    Log.Message($"Loading complete, total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
+                    return true;
+                }
+                return false;
             }
-            return false;
+            catch (Exception ex)
+            {
+                Log.Error("ShouldSkipClearPatches threw, falling back to normal ClearCachedPatches", ex);
+                return false;
+            }
         }
 
         /// <summary>
