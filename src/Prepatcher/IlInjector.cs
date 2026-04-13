@@ -229,6 +229,69 @@ namespace FluxxField.DefLoadCache.Prepatcher
         }
 
         /// <summary>
+        /// Injects a skip-prefix into ErrorCheckPatches so that on cache-hit
+        /// runs the method is a no-op. Patch ConfigErrors validation is wasted
+        /// work when the cache will be used since ApplyPatches itself gets skipped.
+        /// Saves ~7 seconds on large modlists.
+        ///
+        /// Based on work by CriDos (https://github.com/CriDos/rimworld-defload-cache).
+        ///
+        /// Layout after injection:
+        ///
+        ///   call ShouldSkipErrorCheckPatches   (returns true on planned cache hit)
+        ///   brtrue ret                         (skip entire method)
+        ///   original body
+        ///   ret
+        /// </summary>
+        [FreePatch]
+        private static void InjectErrorCheckPatchesSkip(ModuleDefinition module)
+        {
+            var loadedModManagerType = module.GetType("Verse.LoadedModManager");
+            if (loadedModManagerType == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: Verse.LoadedModManager not found (ErrorCheckPatches skip)");
+                return;
+            }
+
+            var errorCheckMethod = loadedModManagerType.Methods
+                .FirstOrDefault(m => m.Name == "ErrorCheckPatches");
+            if (errorCheckMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ErrorCheckPatches method not found");
+                return;
+            }
+
+            MethodInfo? shouldSkipMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.ShouldSkipErrorCheckPatches),
+                BindingFlags.Public | BindingFlags.Static);
+            if (shouldSkipMethod == null)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ShouldSkipErrorCheckPatches not found via reflection");
+                return;
+            }
+
+            MethodReference shouldSkipRef = module.ImportReference(shouldSkipMethod);
+            ILProcessor il = errorCheckMethod.Body.GetILProcessor();
+
+            if (errorCheckMethod.Body.Instructions.Count == 0)
+            {
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ErrorCheckPatches body is empty");
+                return;
+            }
+
+            var lastRet = errorCheckMethod.Body.Instructions.Last(i => i.OpCode == OpCodes.Ret);
+            Instruction firstInstruction = errorCheckMethod.Body.Instructions[0];
+
+            var callSkip = il.Create(OpCodes.Call, shouldSkipRef);
+            var brSkip = il.Create(OpCodes.Brtrue, lastRet);
+
+            il.InsertBefore(firstInstruction, callSkip);
+            il.InsertBefore(firstInstruction, brSkip);
+
+            System.Console.WriteLine("[DefLoadCache] FreePatch: injected ShouldSkipErrorCheckPatches prefix into ErrorCheckPatches");
+        }
+
+        /// <summary>
         /// Stage G: Injects a prefix into LoadModXML that skips the entire
         /// method body when a cache file exists for the current fingerprint.
         /// On skip, returns an empty List&lt;LoadableXmlAsset&gt; so

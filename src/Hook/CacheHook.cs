@@ -256,6 +256,48 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
+        /// Called by injected IL at the top of ErrorCheckPatches. On cache-hit
+        /// runs, patch config validation is wasted work since ApplyPatches will
+        /// be skipped entirely. Saves ~7 seconds on large modlists.
+        ///
+        /// Based on work by CriDos (https://github.com/CriDos/rimworld-defload-cache).
+        ///
+        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipErrorCheckPatches)</c>.
+        /// </summary>
+        public static bool ShouldSkipErrorCheckPatches()
+        {
+            try
+            {
+                var settings = DefLoadCacheMod.Settings;
+                if (settings != null && (!settings.cacheEnabled || !settings.skipPatchApplication))
+                    return false;
+
+                if (settings != null && settings.skipNextLaunch)
+                    return false;
+
+                // If fingerprint hasn't been computed yet (Stage G disabled),
+                // compute it now to check if a cache exists.
+                if (_currentFingerprint == null)
+                {
+                    _currentFingerprint = ModlistFingerprint.Compute();
+                }
+
+                if (_currentFingerprint != null && CacheStorage.Exists(_currentFingerprint))
+                {
+                    Log.Message("ErrorCheckPatches skipped, cache hit makes patch validation unnecessary");
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("ShouldSkipErrorCheckPatches threw, falling back to normal ErrorCheckPatches", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Called by injected IL at the top of ClearCachedPatches. Returns true
         /// on cache-hit runs so the injected brtrue skips the entire method body,
         /// preventing thousands of spurious "patch operation failed" log entries
