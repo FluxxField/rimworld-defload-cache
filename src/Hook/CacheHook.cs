@@ -319,17 +319,14 @@ namespace FluxxField.DefLoadCache
                 foreach (var kvp in nodeCountsByMod)
                     totalNodeCount += kvp.Value;
 
-                byte[] bytes = CacheFormat.Serialize(xmlDoc);
-                ModAttributionTagger.UnstampAttributions(xmlDoc);
-
-                // Build meta.json with node counts for post-load validation
+                // Build meta.json first (need sizeBytes after write)
+                // sizeBytes will be 0 initially, updated after streaming write
                 var metaSb = new System.Text.StringBuilder();
                 metaSb.Append("{");
                 metaSb.Append($"\"timestamp\":\"{DateTime.UtcNow:o}\",");
                 metaSb.Append($"\"modCount\":{LoadedModManager.RunningModsListForReading.Count},");
                 metaSb.Append($"\"rimworldVersion\":\"{RimWorld.VersionControl.CurrentVersionString}\",");
                 metaSb.Append($"\"cacheFormatVersion\":{ModlistFingerprint.CacheFormatVersion},");
-                metaSb.Append($"\"sizeBytes\":{bytes.Length},");
                 metaSb.Append($"\"totalNodeCount\":{totalNodeCount},");
                 metaSb.Append("\"nodeCountsByMod\":{");
                 bool first = true;
@@ -350,11 +347,15 @@ namespace FluxxField.DefLoadCache
                 }
                 metaSb.Append("]}");
 
-                CacheStorage.Write(_currentFingerprint, bytes, metaSb.ToString());
+                // Stream directly to disk. No byte[] allocation, keeping
+                // memory flat even for large modlists (50-100MB uncompressed).
+                long sizeBytes = CacheStorage.Write(_currentFingerprint, xmlDoc, metaSb.ToString());
+                ModAttributionTagger.UnstampAttributions(xmlDoc);
+
                 sw.Stop();
                 LastRunWasMiss = true;
                 _pipelineSw.Stop();
-                Log.Message($"Cache saved, {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({bytes.Length / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
+                Log.Message($"Cache saved, {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({sizeBytes / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {

@@ -10,33 +10,27 @@ namespace FluxxField.DefLoadCache
     /// </summary>
     internal static class CacheFormat
     {
-        public static byte[] Serialize(XmlDocument doc)
+        /// <summary>
+        /// Streams the XmlDocument directly to a gzipped file on disk.
+        /// No intermediate byte[] allocation, so memory usage stays flat
+        /// even for large documents (50-100MB uncompressed).
+        /// Returns the compressed file size in bytes.
+        /// </summary>
+        public static long SerializeToFile(XmlDocument doc, string filePath)
         {
-            using (var ms = new MemoryStream())
+            using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 65536))
+            using (var gz = new GZipStream(fs, CompressionLevel.Fastest))
+            using (var writer = XmlWriter.Create(gz, new XmlWriterSettings
             {
-                using (var gz = new GZipStream(ms, CompressionLevel.Fastest, leaveOpen: true))
-                using (var writer = XmlWriter.Create(gz, new XmlWriterSettings
-                {
-                    Encoding = System.Text.Encoding.UTF8,
-                    Indent = false,
-                    OmitXmlDeclaration = false,
-                }))
-                {
-                    doc.Save(writer);
-                }
-                return ms.ToArray();
-            }
-        }
-
-        public static XmlDocument Deserialize(byte[] bytes)
-        {
-            using (var ms = new MemoryStream(bytes))
-            using (var gz = new GZipStream(ms, CompressionMode.Decompress))
-            using (var reader = XmlReader.Create(gz))
+                Encoding = System.Text.Encoding.UTF8,
+                Indent = false,
+                OmitXmlDeclaration = false,
+            }))
             {
-                var doc = new XmlDocument();
-                doc.Load(reader);
-                return doc;
+                doc.Save(writer);
+                writer.Flush();
+                gz.Flush();
+                return fs.Length;
             }
         }
     }

@@ -103,7 +103,13 @@ namespace FluxxField.DefLoadCache
             }
         }
 
-        public static void Write(string fingerprint, byte[] bytes, string metaJson)
+        /// <summary>
+        /// Streams the XmlDocument directly to a gzipped cache file on disk.
+        /// Uses a temp file + atomic rename for crash safety. No intermediate
+        /// byte[] allocation, keeping memory usage flat during cache writes.
+        /// Returns the compressed file size in bytes, or -1 on failure.
+        /// </summary>
+        public static long Write(string fingerprint, System.Xml.XmlDocument doc, string metaJson)
         {
             try
             {
@@ -112,7 +118,7 @@ namespace FluxxField.DefLoadCache
             catch (Exception ex)
             {
                 Log.Error($"could not create cache root {CacheRoot}", ex);
-                return;
+                return -1;
             }
 
             string finalPath = PathForFingerprint(fingerprint);
@@ -120,7 +126,7 @@ namespace FluxxField.DefLoadCache
 
             try
             {
-                File.WriteAllBytes(tmpPath, bytes);
+                long sizeBytes = CacheFormat.SerializeToFile(doc, tmpPath);
 
                 // .NET Framework File.Move throws if destination exists; use File.Replace in that case.
                 if (File.Exists(finalPath))
@@ -134,14 +140,17 @@ namespace FluxxField.DefLoadCache
 
                 File.WriteAllText(MetaPathForFingerprint(fingerprint), metaJson);
 
-                Log.Message($"Cache file written ({bytes.Length / 1024} KB)");
+                Log.Message($"Cache file written ({sizeBytes / 1024} KB)");
 
                 Prune();
+
+                return sizeBytes;
             }
             catch (Exception ex)
             {
                 Log.Error($"failed to write cache {finalPath}", ex);
                 try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+                return -1;
             }
         }
 
