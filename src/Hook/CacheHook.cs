@@ -228,7 +228,7 @@ namespace FluxxField.DefLoadCache
                         return false;
                     }
                     docMutated = true;
-                    xmlDoc.Load(stream);
+                    CacheFormat.LoadInto(xmlDoc, stream);
                 }
 
                 assetlookup.Clear();

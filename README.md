@@ -162,7 +162,7 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loa
 - ~~**Profile-aware cache pruning.**~~ **Done!** Caches are matched to saved mod list profiles. Tweaking a list replaces the old cache instead of creating duplicates.
 - **Per-file content checksums.** Maintain a persistent map of file path → mtime + content checksum. Only recompute checksums when a file's mtime changes. If Steam re-downloads a mod but the content is byte-for-byte identical, the checksum stays the same and the cache survives. Improves cache hit rates on large modlists where workshop mods get frequent metadata-only updates.
 - ~~**`ErrorCheckPatches` skip on cache hit.**~~ **Done!** Patch config validation is skipped on cache-hit launches, saving ~7 seconds on large modlists.
-- **Binary cache format.** Replace gzipped XML with a compact binary format for faster deserialization. Current cache-hit deserialization is ~2.3 seconds; a binary format could cut this significantly.
+- ~~**Binary cache format.**~~ **Done!** Cache now uses binary XML (XmlDictionaryWriter/Reader) instead of text XML for faster deserialization on cache-hit launches.
 
 ### Phase 2: Checkpoint-based incremental rebuild
 
