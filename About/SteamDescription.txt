@@ -9,12 +9,15 @@ Every time RimWorld launches, it reads thousands of XML files from every mod and
 DefLoadCache saves the result after the first launch. On every launch after that with the same mod list, it loads the cached result in seconds instead of redoing all that work.
 
 [h2]Performance[/h2]
-Tested on a 576-mod Combat Extended milsim load order:
+Tested on a 414-mod Combat Extended milsim load order:
 [list]
-[*] Total launch time: [b]~14 min to ~8 min[/b] (45% faster)
-[*] Mod XML loading + patching: [b]~6 min to ~23 seconds[/b]
+[*] First launch (builds cache): [b]~9:10[/b] (slightly slower than normal, saves cache to disk)
+[*] Every launch after that: [b]~2:40[/b] (71% faster)
+[*] After changing your mod list (experimental incremental rebuild): [b]~3:29[/b] instead of rebuilding from scratch
 [*] Cache size: ~7 MB per mod list
 [/list]
+
+[b]Important: Your first launch after installing will be slightly slower than normal.[/b] This is because the mod needs to build the cache. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
 
 Your results will vary based on mod count, hardware, and which mods you run. Larger mod lists see bigger improvements.
 
@@ -85,7 +88,7 @@ Access via [b]Options > Mod Settings > DefLoadCache[/b]:
 [url=https://github.com/FluxxField/rimworld-defload-cache]GitHub[/url]. MIT licensed, contributions welcome.
 
 [h2]Roadmap[/h2]
-DefLoadCache currently saves ~6 minutes on a 576-mod list. There's more coming.
+DefLoadCache reduces launch time by ~71% on a 414-mod list (9:06 to 2:40). There's more coming.
 
 [b]Near-term[/b]
 [list]

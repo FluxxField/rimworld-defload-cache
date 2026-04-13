@@ -10,9 +10,9 @@
   </supportedVersions>
   <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
 
-On the first launch with a given mod list, DefLoadCache builds a cache of the fully-patched def tree. On subsequent launches with the same mod list, it skips reading thousands of XML files from disk and re-running thousands of XML patches, loading the cached result instead.
+IMPORTANT: Your first launch after installing will be slightly slower than normal. This is because the mod needs to build the cache. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
 
-Tested on a 576-mod load order: launch time reduced from ~14 minutes to ~8 minutes (45% faster). The mod XML loading and patch application pipeline specifically goes from ~6 minutes to ~23 seconds.
+Tested on a 414-mod load order: first launch is slightly slower than normal (~9:10) because it builds the cache. Every launch after that loads in ~2:40 (71% faster). When you change your mod list, the experimental incremental rebuild can cut rebuild time from 9 minutes to 3:29. Incremental rebuild time depends on where the changed mod sits in the load order.
 
 Features:
 - Automatic cache invalidation when mods, RimWorld version, or DLLs change
@@ -22,6 +22,9 @@ Features:
 - Skips unnecessary patch validation on cached launches
 - Configurable settings with per-feature toggles
 - Zero gameplay impact: only affects load time
+
+Experimental (opt-in via settings):
+- Checkpoint-based incremental rebuild. When you change your mod list, the game loads the nearest valid checkpoint and replays only the changed mods instead of rebuilding everything. On a 414-mod list, removing a mod near the end rebuilds in 13 seconds instead of 5+ minutes.
 
 Safety:
 - Pre-load cache validation verifies the cache file is intact before using it

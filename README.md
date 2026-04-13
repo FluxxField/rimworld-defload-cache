@@ -20,16 +20,20 @@ DefLoadCache intercepts the mod loading pipeline and caches the fully-patched de
 
 The cache automatically invalidates when anything changes: mods added/removed, mod versions updated, DLLs changed, or RimWorld updated.
 
+**Important: Your first launch after installing will be slightly slower than normal.** The mod runs the full loading pipeline and then saves the result to disk, which adds a few seconds. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
+
 ## Performance
 
-Tested on a 576-mod Combat Extended milsim load order:
+Tested on a 414-mod Combat Extended milsim load order:
 
 | Metric | Without Cache | With Cache | Improvement |
 |--------|--------------|------------|-------------|
-| Total launch time | ~14 min | ~7:40 | **45% faster** |
-| Mod XML loading + patching | ~6 min | ~23 sec | **15.6x faster** |
-| Fingerprint computation | - | 98-341ms | - |
+| First launch (cache build) | ~9:06 | ~9:10 | slightly slower (saves cache) |
+| Subsequent launches (cache hit) | ~9:06 | ~2:40 | **71% faster** |
+| Mod list change (incremental rebuild) | ~9:06 | ~3:29 | **62% faster** |
+| Patch pipeline on incremental | ~5.6 min | ~13 sec | **96% faster** |
 | Cache size on disk | - | ~7 MB | - |
+| Checkpoint storage | - | ~93 MB | experimental |
 
 ### What DefLoadCache skips on cached launches
 - `LoadModXML`, reading and parsing 10,000+ XML files from disk
@@ -133,7 +137,7 @@ If validation shows PASSED, DefLoadCache served the correct data. If there's any
 
 ## Correctness Verification
 
-DefLoadCache includes a built-in diagnostic dump tool. When enabled in settings, it writes a sorted snapshot of every loaded def (type, defName, mod, label) to a text file. Running this on both a cache-miss and cache-hit launch produces identical output (55,241 defs verified on a 576-mod list).
+DefLoadCache includes a built-in diagnostic dump tool. When enabled in settings, it writes a sorted snapshot of every loaded def (type, defName, mod, label) to a text file. Running this on both a cache-miss and cache-hit launch produces identical output (55,245 defs verified on a 414-mod list).
 
 ## Building from Source
 
@@ -154,7 +158,7 @@ Uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Ceci
 
 ## Roadmap
 
-DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loading and patch application. There's more on the table.
+DefLoadCache reduces launch time by ~71% on a 414-mod list (9:06 to 2:40) by caching mod XML loading and patch application. There's more on the table.
 
 ### Near-term improvements
 - ~~**Content-aware fingerprinting.**~~ **Done!** The fingerprint now includes file modification timestamps. Same-size content changes invalidate the cache automatically.
@@ -164,23 +168,27 @@ DefLoadCache currently saves ~6 minutes on a 576-mod list by caching mod XML loa
 - ~~**`ErrorCheckPatches` skip on cache hit.**~~ **Done!** Patch config validation is skipped on cache-hit launches, saving ~7 seconds on large modlists.
 - ~~**Binary cache format.**~~ **Done!** Cache now uses binary XML (XmlDictionaryWriter/Reader) instead of text XML for faster deserialization on cache-hit launches.
 
-### Phase 2: Checkpoint-based incremental rebuild
+### Phase 2: Checkpoint-based incremental rebuild (Experimental)
 
-The big one. Instead of rebuilding the entire cache when any mod changes, store intermediate checkpoints along the load order. When a mod is added, removed, or updated, find the latest valid checkpoint and replay patches from there.
+Instead of rebuilding the entire cache when any mod changes, DefLoadCache saves intermediate checkpoints along the load order. When a mod is added, removed, or updated, it finds the latest valid checkpoint and replays patches from there.
 
-This is the same approach compilers use for incremental builds. The current single-cache design is a special case where N=1 checkpoint.
+This is the same approach compilers use for incremental builds. Tested on a 414-mod milsim list: removing a mod near the end loaded checkpoint 399 and replayed only 13 mods instead of all 414. Patch pipeline time dropped from 5.6 minutes to 13 seconds (96% reduction).
 
-**Implementation roadmap (each step ships independently):**
-1. **PatchOperation safety audit.** Before building any of this, audit every PatchOperation subclass (vanilla and modded) to determine which are pure functions of the document. Vanilla ops are safe. Custom mod ops need IL analysis to verify they don't read the filesystem, use randomness, or depend on runtime state. This audit gates the entire feature.
-2. **Per-mod fingerprints.** Split the modlist fingerprint into individual per-mod hashes. No behavior change, just restructuring for the next steps.
-3. **Single early checkpoint after Core+DLCs.** Validates the checkpoint mechanism with minimal complexity. Core and DLCs rarely change, so this checkpoint is almost always valid.
-4. **N checkpoints + incremental replay.** ~10 checkpoints spaced across the load order. On mod changes, walk the load order to find where it diverges, load the latest valid checkpoint, replay from there. Mods with unsafe custom PatchOperations act as checkpoint barriers, with safe mods checkpointed past them.
+Currently behind an experimental flag (off by default). Enable in Mod Settings under Experimental Features.
+
+**Completed steps:**
+1. ~~**PatchOperation safety audit.**~~ **Done!** Audited 142 PatchOperation types across a 414-mod list. 129 custom types from 23 mods, all safe for checkpointing (only read mod settings, not filesystem/randomness).
+2. ~~**Per-mod fingerprints.**~~ **Done!** Each mod gets its own SHA256 hash stored in meta.json.
+3. ~~**Full body replacement of ApplyPatches.**~~ **Done!** Replaced 90 lines of fragile IL injection with a 4-instruction body replacement. All patch logic now lives in managed C# with per-mod loop boundaries.
+4. ~~**N checkpoints + incremental replay.**~~ **Done!** Checkpoints saved after Core+DLCs and every 50 mods. On mod changes, loads the latest valid checkpoint and replays from there.
 
 **What this enables:**
-- Add a mod at the end of load order: replay 1 mod's patches instead of all 500+
-- Update a mod in the middle: replay from that point forward, not from scratch
-- Remove a mod: replay from that point forward without it
-- Daily Steam Workshop updates no longer invalidate the whole cache
+- Remove a mod near the end: replay ~13 mods instead of all 414 (96% faster rebuild)
+- Add a mod at the end: replay just the new mod's patches
+- Update a mod in the middle: replay from that point forward
+- Daily Steam Workshop updates only rebuild from the changed mod onward
+
+**Note:** Incremental rebuild time depends on where the changed mod sits in the load order. Changes near the end are fast (few mods to replay). Changes near the top rebuild most of the list since everything after the change point needs to be replayed.
 
 ### Other potential features
 - **Cached parsed Def objects.** Skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires serializing arbitrary C# objects with cross-references. Research-level complexity.
