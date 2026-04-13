@@ -415,6 +415,9 @@ namespace FluxxField.DefLoadCache
                 LastRunWasMiss = true;
                 _pipelineSw.Stop();
                 Log.Message($"Cache saved, {totalNodeCount} defs from {nodeCountsByMod.Count} mods ({sizeBytes / 1024} KB) in {sw.ElapsedMilliseconds}ms. Total pipeline time: {_pipelineSw.ElapsedMilliseconds}ms");
+
+                // Run PatchOperation audit on cache miss (gated by const flag)
+                PatchOperationAudit.RunAudit();
             }
             catch (Exception ex)
             {
