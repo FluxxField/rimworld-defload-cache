@@ -97,8 +97,18 @@ namespace FluxxField.DefLoadCache
                 validationLine = "Validation:  N/A, cache not active";
             }
 
+            // Get our version from the mod's content pack
+            string modVersion = "unknown";
+            try
+            {
+                var mod = LoadedModManager.GetMod<DefLoadCacheMod>();
+                if (mod?.Content?.ModMetaData?.ModVersion != null)
+                    modVersion = mod.Content.ModMetaData.ModVersion;
+            }
+            catch { }
+
             Log.Message(Border);
-            Log.Message("  DefLoadCache Status");
+            Log.Message($"  DefLoadCache Status (v{modVersion})");
             Log.Message($"  Result:      {result}");
             Log.Message($"  Fingerprint: {fingerprint}");
             Log.Message($"  Cache built: {cacheBuilt}");
