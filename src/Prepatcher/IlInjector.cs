@@ -31,6 +31,18 @@ namespace FluxxField.DefLoadCache.Prepatcher
     /// </summary>
     public static class IlInjector
     {
+        /// <summary>
+        /// Replaces the entire body of ApplyPatches with a single call to
+        /// CacheHook.ApplyPatchesReplacement. All logic (cache hit/miss,
+        /// patch iteration, saving) lives in managed C# instead of fragile
+        /// IL injection with branch retargeting and exception handler fixup.
+        ///
+        /// The injected body is just:
+        ///   ldarg.0   (xmlDoc)
+        ///   ldarg.1   (assetlookup)
+        ///   call      CacheHook.ApplyPatchesReplacement
+        ///   ret
+        /// </summary>
         [FreePatch]
         private static void InjectApplyPatchesHook(ModuleDefinition module)
         {
@@ -49,120 +61,29 @@ namespace FluxxField.DefLoadCache.Prepatcher
                 return;
             }
 
-            // Resolve managed hook targets via reflection
-            MethodInfo? hookFiredMethod = typeof(CacheHook).GetMethod(
-                nameof(CacheHook.HookFired),
+            MethodInfo? replacementMethod = typeof(CacheHook).GetMethod(
+                nameof(CacheHook.ApplyPatchesReplacement),
                 BindingFlags.Public | BindingFlags.Static);
-            MethodInfo? tryLoadCachedMethod = typeof(CacheHook).GetMethod(
-                nameof(CacheHook.TryLoadCached),
-                BindingFlags.Public | BindingFlags.Static);
-            MethodInfo? saveToCacheMethod = typeof(CacheHook).GetMethod(
-                nameof(CacheHook.SaveToCache),
-                BindingFlags.Public | BindingFlags.Static);
-            if (hookFiredMethod == null || tryLoadCachedMethod == null || saveToCacheMethod == null)
+            if (replacementMethod == null)
             {
-                System.Console.WriteLine("[DefLoadCache] FreePatch: required hook methods not found via reflection");
+                System.Console.WriteLine("[DefLoadCache] FreePatch: ApplyPatchesReplacement not found via reflection");
                 return;
             }
 
-            MethodReference hookFiredRef = module.ImportReference(hookFiredMethod);
-            MethodReference tryLoadCachedRef = module.ImportReference(tryLoadCachedMethod);
-            MethodReference saveToCacheRef = module.ImportReference(saveToCacheMethod);
+            MethodReference replacementRef = module.ImportReference(replacementMethod);
+
+            // Clear the entire original body and replace with our call
+            applyPatchesMethod.Body.Instructions.Clear();
+            applyPatchesMethod.Body.ExceptionHandlers.Clear();
+            applyPatchesMethod.Body.Variables.Clear();
 
             ILProcessor il = applyPatchesMethod.Body.GetILProcessor();
+            il.Append(il.Create(OpCodes.Ldarg_0));
+            il.Append(il.Create(OpCodes.Ldarg_1));
+            il.Append(il.Create(OpCodes.Call, replacementRef));
+            il.Append(il.Create(OpCodes.Ret));
 
-            if (applyPatchesMethod.Body.Instructions.Count == 0)
-            {
-                System.Console.WriteLine("[DefLoadCache] FreePatch: ApplyPatches body is empty (abstract or unresolved?)");
-                return;
-            }
-
-            // Capture the original first instruction BEFORE any insertion
-            Instruction firstInstruction = applyPatchesMethod.Body.Instructions[0];
-
-            // 1. Stage A: inject `call HookFired()` at the very top
-            Instruction callHookFired = il.Create(OpCodes.Call, hookFiredRef);
-            il.InsertBefore(firstInstruction, callHookFired);
-
-            // 2. Stage C: inject SaveToCache postfix before every ret, with
-            //    full branch-retargeting and exception handler fixup.
-            var retInstructions = applyPatchesMethod.Body.Instructions
-                .Where(i => i.OpCode == OpCodes.Ret)
-                .ToList();
-
-            foreach (var ret in retInstructions)
-            {
-                var ldArgDoc = il.Create(OpCodes.Ldarg_0);
-                var ldArgLookup = il.Create(OpCodes.Ldarg_1);
-                var callSave = il.Create(OpCodes.Call, saveToCacheRef);
-
-                // Retarget any branch (leave.s from catch blocks, etc.) that
-                // targeted this ret to instead target our first injected
-                // instruction. Otherwise those branches land directly on ret,
-                // bypassing our SaveToCache injection as dead code.
-                foreach (var inst in applyPatchesMethod.Body.Instructions)
-                {
-                    if (inst.Operand == ret)
-                    {
-                        inst.Operand = ldArgDoc;
-                    }
-                }
-
-                // Also retarget multi-target switch Operand arrays
-                foreach (var inst in applyPatchesMethod.Body.Instructions)
-                {
-                    if (inst.Operand is Instruction[] targets)
-                    {
-                        for (int i = 0; i < targets.Length; i++)
-                        {
-                            if (targets[i] == ret) targets[i] = ldArgDoc;
-                        }
-                    }
-                }
-
-                // Fix exception handler boundaries. TryEnd/HandlerEnd are
-                // exclusive pointers; if they referenced ret, re-point to
-                // ldArgDoc so our postfix runs outside the protected region.
-                foreach (var handler in applyPatchesMethod.Body.ExceptionHandlers)
-                {
-                    if (handler.TryStart == ret) handler.TryStart = ldArgDoc;
-                    if (handler.TryEnd == ret) handler.TryEnd = ldArgDoc;
-                    if (handler.HandlerStart == ret) handler.HandlerStart = ldArgDoc;
-                    if (handler.HandlerEnd == ret) handler.HandlerEnd = ldArgDoc;
-                    if (handler.FilterStart == ret) handler.FilterStart = ldArgDoc;
-                }
-
-                il.InsertBefore(ret, ldArgDoc);
-                il.InsertBefore(ret, ldArgLookup);
-                il.InsertBefore(ret, callSave);
-            }
-
-            // 3. Stage D: inject TryLoadCached prefix AFTER the Stage C
-            //    postfix work. Placement: between the HookFired call and the
-            //    original first instruction.
-            //
-            //    The brtrue operand targets the LAST ret directly (Cecil
-            //    preserves Instruction references, so even though we've
-            //    inserted instructions before ret in Stage C, brtrue's
-            //    operand is still ret, so the branch lands past the whole
-            //    SaveToCache postfix).
-            //
-            //    This step MUST run AFTER the Stage C retargeting loop above.
-            //    If brtrue were inserted before that loop, the loop would
-            //    helpfully retarget its operand from ret to ldArgDoc, which
-            //    is the opposite of what we want.
-            Instruction brtrueTarget = retInstructions[retInstructions.Count - 1];
-            var ldArg0_D = il.Create(OpCodes.Ldarg_0);
-            var ldArg1_D = il.Create(OpCodes.Ldarg_1);
-            var callTryLoad = il.Create(OpCodes.Call, tryLoadCachedRef);
-            var brtrueCacheHit = il.Create(OpCodes.Brtrue, brtrueTarget);
-
-            il.InsertBefore(firstInstruction, ldArg0_D);
-            il.InsertBefore(firstInstruction, ldArg1_D);
-            il.InsertBefore(firstInstruction, callTryLoad);
-            il.InsertBefore(firstInstruction, brtrueCacheHit);
-
-            System.Console.WriteLine($"[DefLoadCache] FreePatch: injected HookFired + TryLoadCached prefix + {retInstructions.Count} SaveToCache postfix(es) into ApplyPatches");
+            System.Console.WriteLine("[DefLoadCache] FreePatch: replaced ApplyPatches body with ApplyPatchesReplacement call");
         }
 
         /// <summary>

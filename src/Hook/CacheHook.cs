@@ -46,6 +46,66 @@ namespace FluxxField.DefLoadCache
         ///
         /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipLoadModXML)</c>.
         /// </summary>
+        /// <summary>
+        /// Complete replacement for the vanilla ApplyPatches method body.
+        /// Called by the IL injector which replaces the entire method with
+        /// a single call to this. All logic lives here in managed C# instead
+        /// of fragile IL injection.
+        ///
+        /// On cache hit: loads cached data, skips everything.
+        /// On cache miss: iterates mods individually (not SelectMany),
+        /// applies each mod's patches with the same try/catch as vanilla,
+        /// then saves the cache. The per-mod loop gives us a natural
+        /// boundary for future checkpoint support.
+        ///
+        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ApplyPatchesReplacement)</c>.
+        /// </summary>
+        public static void ApplyPatchesReplacement(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
+        {
+            try
+            {
+                _pipelineSw.Restart();
+
+                // Compute fingerprint if not already done by ShouldSkipLoadModXML
+                if (_currentFingerprint == null)
+                {
+                    var fpSw = Stopwatch.StartNew();
+                    _currentFingerprint = ModlistFingerprint.Compute();
+                    fpSw.Stop();
+                    Log.Message($"Fingerprint computed in {fpSw.ElapsedMilliseconds}ms: {_currentFingerprint}");
+                }
+
+                // Try loading from cache
+                if (TryLoadCached(xmlDoc, assetlookup))
+                    return;
+
+                // Cache miss: apply patches per-mod (same behavior as vanilla's
+                // SelectMany loop, but with per-mod boundaries for future checkpoints)
+                var mods = LoadedModManager.RunningModsListForReading;
+                for (int i = 0; i < mods.Count; i++)
+                {
+                    var mod = mods[i];
+                    foreach (var patch in mod.Patches)
+                    {
+                        try
+                        {
+                            patch.Apply(xmlDoc);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Verse.Log.Error("Error in patch.Apply(): " + ex);
+                        }
+                    }
+                }
+
+                SaveToCache(xmlDoc, assetlookup);
+            }
+            catch (System.Exception ex)
+            {
+                Verse.Log.Error("[DefLoadCache] ApplyPatchesReplacement threw, game may not load correctly: " + ex);
+            }
+        }
+
         public static bool ShouldSkipLoadModXML()
         {
             try
