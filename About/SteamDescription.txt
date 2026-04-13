@@ -17,7 +17,9 @@ Tested on a 414-mod Combat Extended milsim load order:
 [*] Cache size: ~7 MB per mod list
 [/list]
 
-[b]Important: Your first launch after installing will be slightly slower than normal.[/b] This is because the mod needs to build the cache. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
+[b]Important: Your first launch after installing will be slightly slower than normal.[/b] The mod runs the full loading pipeline and then saves the result to disk, which adds a few seconds. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
+
+[b]Hardware note:[/b] DefLoadCache benefits most from an SSD and 16GB+ RAM. On an HDD or with limited RAM, the cache read/write overhead may reduce the time savings. The mod tries to optimize for this, but disk speed is a major factor.
 
 Your results will vary based on mod count, hardware, and which mods you run. Larger mod lists see bigger improvements.
 

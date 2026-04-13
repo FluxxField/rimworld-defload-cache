@@ -22,6 +22,8 @@ The cache automatically invalidates when anything changes: mods added/removed, m
 
 **Important: Your first launch after installing will be slightly slower than normal.** The mod runs the full loading pipeline and then saves the result to disk, which adds a few seconds. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
 
+**Hardware note:** DefLoadCache benefits most from an SSD and 16GB+ RAM. On an HDD or with limited RAM, the cache read/write overhead may reduce the time savings. The mod tries to optimize for this (streaming I/O, no large memory allocations), but disk speed is a major factor.
+
 ## Performance
 
 Tested on a 414-mod Combat Extended milsim load order:
