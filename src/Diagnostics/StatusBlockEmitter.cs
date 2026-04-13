@@ -1,4 +1,5 @@
 using System;
+using RimWorld;
 using Verse;
 
 namespace FluxxField.DefLoadCache
@@ -120,6 +121,24 @@ namespace FluxxField.DefLoadCache
             Log.Message("  Mod Settings → DefLoadCache → \"Test without");
             Log.Message("  cache (next launch only)\", then restart.");
             Log.Message(Border);
+
+            // Show in-game notification so users know what happened
+            try
+            {
+                if (CacheHook.CacheHitOccurred)
+                {
+                    Messages.Message(
+                        "DefLoadCache: Loaded from cache. Your launch was faster thanks to cached data.",
+                        MessageTypeDefOf.SilentInput, false);
+                }
+                else if (CacheHook.LastRunWasMiss)
+                {
+                    Messages.Message(
+                        "DefLoadCache: Cache built for the first time. Your next launch will be faster.",
+                        MessageTypeDefOf.TaskCompletion, false);
+                }
+            }
+            catch { }
         }
     }
 }

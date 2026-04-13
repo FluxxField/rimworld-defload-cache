@@ -71,12 +71,14 @@ namespace FluxxField.DefLoadCache
                 // Experimental: include mod settings config files in fingerprint
                 // so that changing a mod setting that affects XML patching
                 // (e.g., VEF toggles) invalidates the cache automatically.
-                if (DefLoadCacheSettings.ExperimentalEnabled
-                    && DefLoadCacheMod.Settings != null
-                    && DefLoadCacheMod.Settings.includeModSettingsInFingerprint)
-                {
-                    AppendHashText(sha, AppendConfigFolderStats());
-                }
+                // TODO: mod settings fingerprinting disabled for now.
+                // RimWorld writes all mod config files on every exit, which
+                // updates their mtime and invalidates the cache every launch.
+                // Need to hash file content instead of mtime to make this work.
+                // if (DefLoadCacheSettings.ExperimentalEnabled)
+                // {
+                //     AppendHashText(sha, AppendConfigFolderStats());
+                // }
 
                 return FinalizeHashToHex(sha);
             }

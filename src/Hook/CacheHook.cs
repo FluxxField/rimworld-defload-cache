@@ -408,9 +408,7 @@ namespace FluxxField.DefLoadCache
 
                 // Experimental: compute and store per-mod hashes for future
                 // checkpoint-based incremental rebuild support
-                if (DefLoadCacheSettings.ExperimentalEnabled
-                    && DefLoadCacheMod.Settings != null
-                    && DefLoadCacheMod.Settings.perModHashing)
+                if (DefLoadCacheSettings.ExperimentalEnabled)
                 {
                     var perModHashes = ModlistFingerprint.ComputePerModHashes();
                     metaSb.Append(",\"perModHashes\":{");

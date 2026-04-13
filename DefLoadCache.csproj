@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Import local paths. Copy DefLoadCache.local.props.example to
+       DefLoadCache.local.props and set your RimWorld/Prepatcher paths. -->
+  <Import Project="DefLoadCache.local.props" Condition="Exists('DefLoadCache.local.props')" />
+
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -11,16 +15,28 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <Nullable>enable</Nullable>
+
+    <!-- Default paths if no local.props file exists (WSL with standard Steam install) -->
+    <RimWorldManaged Condition="'$(RimWorldManaged)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed</RimWorldManaged>
+    <PrepatcherAssemblies Condition="'$(PrepatcherAssemblies)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies</PrepatcherAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- RimWorld game assemblies -->
     <Reference Include="Assembly-CSharp">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <HintPath>$(RimWorldManaged)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(RimWorldManaged)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(RimWorldManaged)/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(RimWorldManaged)/UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
 
@@ -29,13 +45,13 @@
          runtime. Bundled Mono.Cecil and MonoMod.Utils types live inside this
          DLL as internal types; Krafs.Publicizer (below) publicizes them. -->
     <Reference Include="0Harmony">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies/0Harmony.dll</HintPath>
+      <HintPath>$(PrepatcherAssemblies)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
 
     <!-- Prepatcher's [FreePatch] attribute API -->
     <Reference Include="0PrepatcherAPI">
-      <HintPath>/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies/0PrepatcherAPI.dll</HintPath>
+      <HintPath>$(PrepatcherAssemblies)/0PrepatcherAPI.dll</HintPath>
       <Private>false</Private>
     </Reference>
 

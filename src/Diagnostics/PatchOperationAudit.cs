@@ -20,7 +20,7 @@ namespace FluxxField.DefLoadCache
         /// all audit code when false. Replace with a settings toggle when
         /// ready to expose to users.
         /// </summary>
-        internal const bool AuditEnabled = true;
+        internal const bool AuditEnabled = false;
 
         internal static void RunAudit()
         {

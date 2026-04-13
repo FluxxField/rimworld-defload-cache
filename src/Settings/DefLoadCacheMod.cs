@@ -8,6 +8,7 @@ namespace FluxxField.DefLoadCache
     internal class DefLoadCacheMod : Mod
     {
         public static DefLoadCacheSettings Settings { get; private set; } = null!;
+        private Vector2 _scrollPosition;
 
         public DefLoadCacheMod(ModContentPack content) : base(content)
         {
@@ -18,8 +19,13 @@ namespace FluxxField.DefLoadCache
 
         public override void DoSettingsWindowContents(UnityEngine.Rect inRect)
         {
+            // Scrollable settings content. The view rect is taller than the
+            // window to accommodate all sections including experimental features.
+            var viewRect = new Rect(0, 0, inRect.width - 16f, 900f);
+            Widgets.BeginScrollView(inRect, ref _scrollPosition, viewRect);
+
             var listing = new Listing_Standard();
-            listing.Begin(inRect);
+            listing.Begin(viewRect);
 
             // --- Master toggle ---
             listing.CheckboxLabeled(
@@ -206,6 +212,7 @@ namespace FluxxField.DefLoadCache
             }
 
             listing.End();
+            Widgets.EndScrollView();
         }
     }
 }

@@ -1,0 +1,17 @@
+<!-- Copy this file to DefLoadCache.local.props and update the paths for your machine. -->
+<!-- DefLoadCache.local.props is gitignored so your paths won't affect other contributors. -->
+<Project>
+  <PropertyGroup>
+    <!-- Path to RimWorld's Managed assemblies folder -->
+    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed -->
+    <!-- Linux:   ~/.steam/steam/steamapps/common/RimWorld/RimWorldLinux64_Data/Managed -->
+    <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed -->
+    <RimWorldManaged>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed</RimWorldManaged>
+
+    <!-- Path to Prepatcher's workshop Assemblies folder (workshop ID 2934420800) -->
+    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies -->
+    <!-- Linux:   ~/.steam/steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
+    <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
+    <PrepatcherAssemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies</PrepatcherAssemblies>
+  </PropertyGroup>
+</Project>

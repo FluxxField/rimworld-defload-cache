@@ -15,5 +15,8 @@ Assemblies/*.pdb
 .DS_Store
 Thumbs.db
 
+# Local build config (machine-specific paths)
+DefLoadCache.local.props
+
 # Internal planning docs
 docs/superpowers/
