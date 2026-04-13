@@ -404,7 +404,28 @@ namespace FluxxField.DefLoadCache
                     if (i > 0) metaSb.Append(',');
                     metaSb.Append($"\"{mods[i].PackageId?.Replace("\"", "\\\"") ?? "<null>"}\"");
                 }
-                metaSb.Append("]}");
+                metaSb.Append("]");
+
+                // Experimental: compute and store per-mod hashes for future
+                // checkpoint-based incremental rebuild support
+                if (DefLoadCacheSettings.ExperimentalEnabled
+                    && DefLoadCacheMod.Settings != null
+                    && DefLoadCacheMod.Settings.perModHashing)
+                {
+                    var perModHashes = ModlistFingerprint.ComputePerModHashes();
+                    metaSb.Append(",\"perModHashes\":{");
+                    bool firstHash = true;
+                    foreach (var (packageId, hash) in perModHashes)
+                    {
+                        if (!firstHash) metaSb.Append(',');
+                        metaSb.Append($"\"{packageId.Replace("\"", "\\\"")}\":\"{hash}\"");
+                        firstHash = false;
+                    }
+                    metaSb.Append("}");
+                    Log.Message($"Per-mod hashes computed for {perModHashes.Count} mods");
+                }
+
+                metaSb.Append("}");
 
                 // Stream directly to disk. No byte[] allocation, keeping
                 // memory flat even for large modlists (50-100MB uncompressed).

@@ -82,6 +82,37 @@ namespace FluxxField.DefLoadCache
             }
         }
 
+        /// <summary>
+        /// Computes individual SHA256 hashes for each mod's fingerprint fragment.
+        /// Returns a list of (packageId, hash) pairs in load order. Used by the
+        /// checkpoint system to find where the mod list diverges from the cache.
+        /// Only called when the experimental perModHashing flag is enabled.
+        /// </summary>
+        internal static List<(string packageId, string hash)> ComputePerModHashes()
+        {
+            var result = new List<(string, string)>();
+            var mods = LoadedModManager.RunningModsListForReading;
+            if (mods == null) return result;
+
+            var fragments = new string[mods.Count];
+            Parallel.For(0, mods.Count, i =>
+            {
+                fragments[i] = BuildModFragment(mods[i]);
+            });
+
+            for (int i = 0; i < mods.Count; i++)
+            {
+                using (var sha = SHA256.Create())
+                {
+                    AppendHashText(sha, fragments[i]);
+                    string hash = FinalizeHashToHex(sha);
+                    result.Add((mods[i].PackageId ?? "<no-id>", hash));
+                }
+            }
+
+            return result;
+        }
+
         private static string BuildModFragment(ModContentPack mod)
         {
             var sb = new StringBuilder();
