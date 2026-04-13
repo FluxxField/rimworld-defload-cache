@@ -70,7 +70,14 @@ namespace FluxxField.DefLoadCache
             }
             else if (CacheHook.LastRunWasMiss)
             {
-                _statusText = "DefLoadCache: Cache built. Next launch will use cached data if mod list does not change.";
+                if (CacheHook.CheckpointUsed)
+                {
+                    _statusText = $"DefLoadCache: Incremental rebuild, replayed {CacheHook.CheckpointModsReplayed} of {CacheHook.CheckpointTotalMods} mods from checkpoint.";
+                }
+                else
+                {
+                    _statusText = "DefLoadCache: Cache built. Next launch will use cached data if mod list does not change.";
+                }
             }
         }
 

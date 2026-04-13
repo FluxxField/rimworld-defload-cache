@@ -21,6 +21,7 @@ namespace FluxxField.DefLoadCache
         // --- Experimental settings (gated by ExperimentalEnabled) ---
         public bool perModHashing = false;
         public bool includeModSettingsInFingerprint = false;
+        public bool checkpointEnabled = false;
 
         // Legacy field kept only for backwards compat when loading old settings files
         private int _legacyMaxCachedProfiles = 10;
@@ -38,6 +39,7 @@ namespace FluxxField.DefLoadCache
             {
                 Scribe_Values.Look(ref perModHashing, "perModHashing", false);
                 Scribe_Values.Look(ref includeModSettingsInFingerprint, "includeModSettingsInFingerprint", false);
+                Scribe_Values.Look(ref checkpointEnabled, "checkpointEnabled", false);
             }
 
             base.ExposeData();

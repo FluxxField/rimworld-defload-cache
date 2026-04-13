@@ -206,9 +206,21 @@ namespace FluxxField.DefLoadCache
                     "Per-mod fingerprint hashing",
                     ref Settings.perModHashing,
                     "Compute and store a separate fingerprint hash for each mod instead of " +
-                    "one combined hash. This is the foundation for future incremental " +
+                    "one combined hash. This is the foundation for incremental " +
                     "rebuild support where only changed mods trigger a partial cache rebuild.\n\n" +
                     "No behavior change yet, just stores extra data for future use.");
+
+                listing.Gap();
+
+                listing.CheckboxLabeled(
+                    "Checkpoint-based incremental rebuild",
+                    ref Settings.checkpointEnabled,
+                    "Save snapshots of the patched document at intervals during loading. " +
+                    "When you add, remove, or update a mod, the game loads the nearest " +
+                    "valid checkpoint and replays only the remaining mods instead of " +
+                    "rebuilding everything from scratch.\n\n" +
+                    "Uses ~100MB of disk space for checkpoints on large modlists. " +
+                    "Dramatically reduces rebuild time when tweaking your mod list.");
             }
 
             listing.End();

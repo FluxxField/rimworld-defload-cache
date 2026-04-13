@@ -87,7 +87,14 @@ namespace FluxxField.DefLoadCache
             }
             else if (CacheHook.LastRunWasMiss)
             {
-                result = "Cache MISS (full load)";
+                if (CacheHook.CheckpointUsed)
+                {
+                    result = $"INCREMENTAL REBUILD (checkpoint at mod {CacheHook.CheckpointModIndex}, replayed {CacheHook.CheckpointModsReplayed} of {CacheHook.CheckpointTotalMods} mods)";
+                }
+                else
+                {
+                    result = "Cache MISS (full load)";
+                }
                 defsLine = "Defs loaded: full pipeline ran";
                 validationLine = "Validation:  N/A, no cache used";
             }
@@ -133,9 +140,18 @@ namespace FluxxField.DefLoadCache
                 }
                 else if (CacheHook.LastRunWasMiss)
                 {
-                    Messages.Message(
-                        "DefLoadCache: Cache built for the first time. Your next launch will be faster.",
-                        MessageTypeDefOf.TaskCompletion, false);
+                    if (CacheHook.CheckpointUsed)
+                    {
+                        Messages.Message(
+                            $"DefLoadCache: Incremental rebuild. Replayed {CacheHook.CheckpointModsReplayed} of {CacheHook.CheckpointTotalMods} mods from checkpoint.",
+                            MessageTypeDefOf.TaskCompletion, false);
+                    }
+                    else
+                    {
+                        Messages.Message(
+                            "DefLoadCache: Cache built for the first time. Your next launch will be faster.",
+                            MessageTypeDefOf.TaskCompletion, false);
+                    }
                 }
             }
             catch { }

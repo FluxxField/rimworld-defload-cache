@@ -27,6 +27,10 @@ namespace FluxxField.DefLoadCache
         private static string? _currentFingerprint;
         internal static bool CacheHitOccurred;
         internal static bool LastRunWasMiss;
+        internal static bool CheckpointUsed;
+        internal static int CheckpointModIndex = -1;
+        internal static int CheckpointModsReplayed;
+        internal static int CheckpointTotalMods;
 
         internal static string? CurrentFingerprint => _currentFingerprint;
 
@@ -85,7 +89,9 @@ namespace FluxxField.DefLoadCache
 
                 // Experimental: try to resume from a checkpoint
                 List<(string packageId, string hash)>? perModHashes = null;
-                if (DefLoadCacheSettings.ExperimentalEnabled)
+                if (DefLoadCacheSettings.ExperimentalEnabled
+                    && DefLoadCacheMod.Settings != null
+                    && DefLoadCacheMod.Settings.checkpointEnabled)
                 {
                     perModHashes = ModlistFingerprint.ComputePerModHashes();
                     int checkpointIndex = CheckpointStorage.FindLatestValidCheckpoint(perModHashes);
@@ -107,7 +113,11 @@ namespace FluxxField.DefLoadCache
                             ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out _);
 
                             startFrom = checkpointIndex + 1;
-                            Log.Message($"Loaded checkpoint at mod index {checkpointIndex} ({mods[checkpointIndex].PackageId}), replaying from index {startFrom} ({mods.Count - startFrom} mods to replay)");
+                            CheckpointUsed = true;
+                            CheckpointModIndex = checkpointIndex;
+                            CheckpointModsReplayed = mods.Count - startFrom;
+                            CheckpointTotalMods = mods.Count;
+                            Log.Message($"Loaded checkpoint at mod index {checkpointIndex} ({mods[checkpointIndex].PackageId}), replaying from index {startFrom} ({CheckpointModsReplayed} mods to replay)");
                         }
                     }
 
@@ -135,7 +145,10 @@ namespace FluxxField.DefLoadCache
                     }
 
                     // Experimental: save checkpoints at intervals
-                    if (DefLoadCacheSettings.ExperimentalEnabled && perModHashes != null)
+                    if (DefLoadCacheSettings.ExperimentalEnabled
+                        && DefLoadCacheMod.Settings != null
+                        && DefLoadCacheMod.Settings.checkpointEnabled
+                        && perModHashes != null)
                     {
                         // Checkpoint after Core+DLCs (first ~4 mods), then every 50 mods
                         bool isCoreDlcBoundary = i < 10 && i + 1 < mods.Count
