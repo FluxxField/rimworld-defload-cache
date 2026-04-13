@@ -210,31 +210,40 @@ namespace FluxxField.DefLoadCache
                     Log.Message($"Built {packageIdToAsset.Count} mod asset mappings for cache hit");
                 }
 
-                // Load into a temporary doc first. If deserialization fails
-                // (corrupt cache, wrong format, etc.), the caller's xmlDoc is
-                // untouched and we fall back to normal loading. No more
-                // "point of no return" crash scenario.
-                XmlDocument cachedDoc;
+                // Validate the cache file is readable before loading into the
+                // caller's doc. Read the entire stream once to verify the GZip
+                // decompresses and the binary XML parses without error. If this
+                // fails, the caller's xmlDoc is untouched and we fall back.
+                // This costs one extra file read (~3-7MB, under 100ms) but avoids
+                // both the crash-on-corrupt scenario and the 2x memory spike from
+                // loading into a temp doc + deep copying.
+                using (var validationStream = CacheStorage.OpenReadStream(_currentFingerprint))
+                {
+                    if (validationStream == null)
+                    {
+                        Log.Warning("TryLoadCached: cache file vanished between Exists and validation read");
+                        return false;
+                    }
+
+                    if (!CacheFormat.TryValidate(validationStream))
+                    {
+                        Log.Error("TryLoadCached: cache file failed validation (corrupt or wrong format), deleting");
+                        try { System.IO.File.Delete(CacheStorage.PathForFingerprint(_currentFingerprint)); } catch { }
+                        try { System.IO.File.Delete(CacheStorage.MetaPathForFingerprint(_currentFingerprint)); } catch { }
+                        return false;
+                    }
+                }
+
+                // Validation passed. Load directly into the caller's doc.
                 using (var stream = CacheStorage.OpenReadStream(_currentFingerprint))
                 {
                     if (stream == null)
                     {
-                        Log.Warning("TryLoadCached: cache file vanished between Exists and OpenReadStream");
+                        Log.Warning("TryLoadCached: cache file vanished between validation and load");
                         return false;
                     }
-                    cachedDoc = new XmlDocument();
-                    CacheFormat.LoadInto(cachedDoc, stream);
+                    CacheFormat.LoadInto(xmlDoc, stream);
                 }
-
-                // Deserialization succeeded. Swap the document element into the
-                // caller's doc. ImportNode with deep=true copies the tree, then
-                // we release the temp doc so the GC can reclaim it promptly.
-                xmlDoc.RemoveAll();
-                if (cachedDoc.DocumentElement != null)
-                {
-                    xmlDoc.AppendChild(xmlDoc.ImportNode(cachedDoc.DocumentElement, true));
-                }
-                cachedDoc = null!; // Release for GC before we do more work
 
                 assetlookup.Clear();
                 int rebuilt = ModAttributionTagger.RebuildAssetLookup(xmlDoc, assetlookup, packageIdToAsset, out var actualCountsByMod);

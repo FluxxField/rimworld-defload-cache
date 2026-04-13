@@ -36,8 +36,33 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
+        /// Validates that a gzipped binary-XML stream is readable without
+        /// loading it into a document. Reads through the entire stream to
+        /// verify GZip decompression and binary XML parsing succeed.
+        /// Uses minimal memory since no DOM is built.
+        /// </summary>
+        public static bool TryValidate(Stream gzipStream)
+        {
+            try
+            {
+                using (var reader = XmlDictionaryReader.CreateBinaryReader(gzipStream, XmlDictionaryReaderQuotas.Max))
+                {
+                    // Read through every node without building a DOM.
+                    // This verifies the binary XML structure is intact.
+                    while (reader.Read()) { }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Loads a gzipped binary-XML cache stream directly into an existing
         /// XmlDocument. Uses XmlDictionaryReader for fast binary parsing.
+        /// Call TryValidate first to ensure the stream is safe to load.
         /// </summary>
         public static void LoadInto(XmlDocument doc, Stream gzipStream)
         {
