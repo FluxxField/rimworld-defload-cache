@@ -16,16 +16,21 @@ Tested on a 576-mod load order: launch time reduced from ~14 minutes to ~8 minut
 
 Features:
 - Automatic cache invalidation when mods, RimWorld version, or DLLs change
-- Support for multiple mod list profiles (switch between RimPy profiles without losing caches)
+- Per-file fingerprinting catches any file change, even same-size content edits
+- Profile-aware cache management, keeps one cache per saved mod list profile
+- Binary XML cache format for fast deserialization on repeat launches
+- Skips unnecessary patch validation on cached launches
 - Configurable settings with per-feature toggles
 - Zero gameplay impact: only affects load time
 
 Safety:
-- Post-load validation verifies cached data against baseline on every launch
+- Pre-load cache validation verifies the cache file is intact before using it
+- Post-load validation verifies per-mod def counts against baseline
 - Self-healing: bad caches are automatically deleted and rebuilt
+- Full fallback coverage: every entry point has error handling, the mod should never crash the game
+- Memory-conscious: cache files stream directly to/from disk, no large memory allocations
 - One-click "Test without cache" button for isolating issues
 - Structured log output for modders reviewing player bug reports
-- Safe fallback: if anything goes wrong, the game loads normally
 
 Requires Prepatcher by Zetrith.</description>
   <modDependencies>
