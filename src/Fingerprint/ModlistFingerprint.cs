@@ -68,6 +68,16 @@ namespace FluxxField.DefLoadCache
                     AppendHashText(sha, fragment);
                 }
 
+                // Experimental: include mod settings config files in fingerprint
+                // so that changing a mod setting that affects XML patching
+                // (e.g., VEF toggles) invalidates the cache automatically.
+                if (DefLoadCacheSettings.ExperimentalEnabled
+                    && DefLoadCacheMod.Settings != null
+                    && DefLoadCacheMod.Settings.includeModSettingsInFingerprint)
+                {
+                    AppendHashText(sha, AppendConfigFolderStats());
+                }
+
                 return FinalizeHashToHex(sha);
             }
         }
@@ -205,6 +215,51 @@ namespace FluxxField.DefLoadCache
             catch
             {
                 return new List<FileInfo>();
+            }
+        }
+
+        /// <summary>
+        /// Builds a fingerprint fragment for the Config/ folder. Includes the
+        /// mtime of every Mod_*.xml file so that any settings change invalidates
+        /// the cache. Returns the fragment as a string to feed into the hash.
+        /// </summary>
+        private static string AppendConfigFolderStats()
+        {
+            try
+            {
+                string configDir = Path.Combine(GenFilePaths.SaveDataFolderPath, "Config");
+                var sb = new StringBuilder();
+                sb.Append("config=");
+
+                if (!Directory.Exists(configDir))
+                {
+                    sb.Append("<none>\n");
+                    return sb.ToString();
+                }
+
+                // Only include Mod_*.xml files, not KeyPrefs, ModsConfig, etc.
+                var files = new List<FileInfo>();
+                foreach (var fi in new DirectoryInfo(configDir).EnumerateFiles("Mod_*.xml"))
+                {
+                    files.Add(fi);
+                }
+                files.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+
+                foreach (var fi in files)
+                {
+                    try
+                    {
+                        sb.Append(fi.Name).Append(',')
+                          .Append(fi.LastWriteTimeUtc.Ticks).Append('\n');
+                    }
+                    catch { }
+                }
+
+                return sb.ToString();
+            }
+            catch
+            {
+                return "config=<error>\n";
             }
         }
 
