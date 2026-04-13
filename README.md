@@ -102,11 +102,11 @@ DefLoadCache is designed to never cause problems for other mods. If something go
 
 - **Post-load validation.** On every cache hit, the mod compares per-mod def counts against the baseline stored when the cache was built. If any counts don't match, the bad cache is automatically deleted and the next launch runs uncached.
 - **Self-healing.** A bad cache never survives two launches. Validation failure triggers automatic cache deletion and forces a clean uncached load on the next restart.
+- **Pre-load cache validation.** Before loading a cache file, the mod reads through the entire file to verify it decompresses and parses correctly. If the file is corrupt or in the wrong format, it's deleted and the game loads normally. The caller's document is never touched until the cache is proven valid.
 - **First-error notice.** If any error occurs in the log during a cache-hit launch, DefLoadCache emits a notice reminding the player to test without the cache before filing bug reports on other mods.
 - **Structured status block.** Every launch emits a clearly delimited block in the log showing cache state, validation result, and troubleshooting guidance. Modders reviewing player logs can instantly see whether DefLoadCache was involved.
-- **Fail-safe error handling.** Every public entry point is wrapped in `try/catch`. If anything throws, the game falls back to normal loading.
-- **Point-of-no-return detection.** If the cached document is corrupted mid-load (after the XML doc has been mutated), the error is logged and rethrown rather than silently producing bad state.
-- **Corrupt cache cleanup.** Cache files that fail to deserialize are automatically deleted.
+- **Full fallback coverage.** Every public entry point is wrapped in `try/catch`. If anything throws at any point, the game falls back to normal loading. The mod should never crash the game under any circumstances.
+- **Memory-conscious design.** Cache files are streamed directly to/from disk without buffering the full document in memory. No temporary copies or memory doubling during cache reads or writes.
 - **Zero side effects.** The mod can be disabled at any time with no impact on other mods.
 
 ### For Mod Authors
