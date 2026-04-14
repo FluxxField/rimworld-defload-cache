@@ -24,7 +24,7 @@ Features:
 - Zero gameplay impact: only affects load time
 
 Experimental (opt-in via settings):
-- Checkpoint-based incremental rebuild. When you change your mod list, the game loads the nearest valid checkpoint and replays only the changed mods instead of rebuilding everything. On a 414-mod list, removing a mod near the end rebuilds in 13 seconds instead of 5+ minutes.
+- Checkpoint-based incremental rebuild. When you add a mod or a mod updates, the game loads the nearest valid checkpoint and replays only the remaining mods instead of rebuilding everything. Works best when building up a mod list. Removing a mod or reordering still triggers a full rebuild since checkpoints carry defs from all mods present when built.
 
 Safety:
 - Pre-load cache validation verifies the cache file is intact before using it

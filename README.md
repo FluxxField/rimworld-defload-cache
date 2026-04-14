@@ -185,12 +185,15 @@ Currently behind an experimental flag (off by default). Enable in Mod Settings u
 4. ~~**N checkpoints + incremental replay.**~~ **Done!** Checkpoints saved after Core+DLCs and every 50 mods. On mod changes, loads the latest valid checkpoint and replays from there.
 
 **What this enables:**
-- Remove a mod near the end: replay ~13 mods instead of all 414 (96% faster rebuild)
 - Add a mod at the end: replay just the new mod's patches
-- Update a mod in the middle: replay from that point forward
+- Update a mod in place: replay from that point forward
 - Daily Steam Workshop updates only rebuild from the changed mod onward
 
-**Note:** Incremental rebuild time depends on where the changed mod sits in the load order. Changes near the end are fast (few mods to replay). Changes near the top rebuild most of the list since everything after the change point needs to be replayed.
+**Limitations:**
+- **Removing a mod always triggers a full rebuild.** Checkpoints contain defs from all mods that were present when built. If a mod is removed, those defs would be stale, so all checkpoints are invalidated and a full rebuild runs. This is a fundamental property of how XPath patches work, not a limitation of this implementation. No design can avoid it without actually running the patches.
+- **Reordering mods also triggers a full rebuild.** Patches run in load order, so changing the order changes the result.
+- **Incremental rebuild time depends on position.** Changes near the end of load order are fast (few mods to replay). Changes near the top rebuild most of the list.
+- Checkpoints work best when you're building up a mod list (adding and testing). That's the common workflow for modpack authors.
 
 ### Other potential features
 - **Cached parsed Def objects.** Skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires serializing arbitrary C# objects with cross-references. Research-level complexity.
