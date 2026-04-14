@@ -123,8 +123,12 @@ namespace FluxxField.DefLoadCache
 
                     if (startFrom == 0)
                     {
-                        // No valid checkpoint, clear old ones since we're doing a full rebuild
+                        // No valid checkpoint. This happens when mods were removed
+                        // or reordered (checkpoints carry defs from all mods present
+                        // when built, so they can't be used for a smaller/different
+                        // modlist). Clear old checkpoints and do a full rebuild.
                         CheckpointStorage.ClearAll();
+                        Log.Message("No valid checkpoint found (mod removed or reordered), running full rebuild");
                     }
                 }
 

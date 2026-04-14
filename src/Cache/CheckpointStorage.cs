@@ -12,6 +12,13 @@ namespace FluxxField.DefLoadCache
     /// a snapshot of the XmlDocument at a specific point in the mod iteration,
     /// stored as a gzipped binary XML file with a meta sidecar.
     ///
+    /// IMPORTANT: Checkpoints are only valid when the current modlist is a
+    /// strict prefix match of the checkpoint's modlist. If any mod was removed
+    /// or reordered, ALL checkpoints are invalidated because the checkpoint
+    /// document contains defs from all mods that were present when it was built.
+    /// Checkpoints can only be used when mods are added after the checkpoint
+    /// position or updated in place.
+    ///
     /// Storage layout:
     ///   DefLoadCache/checkpoints/checkpoint_{modIndex}.xml.gz
     ///   DefLoadCache/checkpoints/checkpoint_{modIndex}.meta.json
@@ -39,21 +46,20 @@ namespace FluxxField.DefLoadCache
 
                 CacheFormat.SerializeToFile(doc, cachePath);
 
-                // Build meta with the per-mod hashes up to this index
+                // Build meta with an ORDERED list of (packageId, hash) pairs.
+                // Order matters because prefix-match validation compares by position.
                 var metaSb = new System.Text.StringBuilder();
                 metaSb.Append("{");
                 metaSb.Append($"\"modIndex\":{modIndex},");
                 metaSb.Append($"\"timestamp\":\"{DateTime.UtcNow:o}\",");
-                metaSb.Append("\"perModHashes\":{");
-                bool first = true;
+                metaSb.Append("\"modSequence\":[");
                 for (int i = 0; i <= modIndex && i < perModHashes.Count; i++)
                 {
                     var (packageId, hash) = perModHashes[i];
-                    if (!first) metaSb.Append(',');
-                    metaSb.Append($"\"{packageId.Replace("\"", "\\\"")}\":\"{hash}\"");
-                    first = false;
+                    if (i > 0) metaSb.Append(',');
+                    metaSb.Append($"{{\"id\":\"{packageId.Replace("\"", "\\\"")}\",\"hash\":\"{hash}\"}}");
                 }
-                metaSb.Append("}}");
+                metaSb.Append("]}");
 
                 File.WriteAllText(metaPath, metaSb.ToString());
                 Log.Message($"Checkpoint saved at mod index {modIndex}");
@@ -65,9 +71,14 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Finds the latest valid checkpoint by comparing stored per-mod hashes
-        /// against the current per-mod hashes. Returns the mod index to start
-        /// replaying from, or -1 if no valid checkpoint exists.
+        /// Finds the latest valid checkpoint using strict prefix matching.
+        /// The checkpoint's mod sequence (packageId + hash at each position)
+        /// must be an exact prefix of the current modlist. If any mod was
+        /// removed or reordered, the checkpoint is invalid because its
+        /// document contains defs from the old modlist configuration.
+        ///
+        /// Returns the mod index to start replaying from, or -1 if no
+        /// valid checkpoint exists.
         /// </summary>
         internal static int FindLatestValidCheckpoint(
             List<(string packageId, string hash)> currentHashes)
@@ -76,7 +87,6 @@ namespace FluxxField.DefLoadCache
                 return -1;
 
             // Find all checkpoint meta files and sort by mod index descending
-            // so we check the latest checkpoints first
             var checkpoints = new List<(int modIndex, string metaPath)>();
             foreach (var file in Directory.GetFiles(CheckpointRoot, "checkpoint_*.meta.json"))
             {
@@ -93,30 +103,23 @@ namespace FluxxField.DefLoadCache
             {
                 try
                 {
-                    // The checkpoint is only valid if mod index is within current list
                     if (modIndex >= currentHashes.Count)
                         continue;
 
                     string meta = File.ReadAllText(metaPath);
-                    var storedHashes = ParsePerModHashes(meta);
-                    if (storedHashes == null)
+                    var storedSequence = ParseModSequence(meta);
+                    if (storedSequence == null || storedSequence.Count != modIndex + 1)
                         continue;
 
-                    // Verify every mod hash from 0 to modIndex matches
+                    // Strict prefix match: every position must have the same
+                    // packageId AND hash. This catches removal (different packageId
+                    // at same position) and updates (same packageId, different hash).
                     bool valid = true;
-                    for (int i = 0; i <= modIndex; i++)
+                    for (int i = 0; i < storedSequence.Count; i++)
                     {
-                        if (i >= currentHashes.Count)
-                        {
-                            valid = false;
-                            break;
-                        }
-
-                        string currentKey = currentHashes[i].packageId;
-                        string currentHash = currentHashes[i].hash;
-
-                        if (!storedHashes.TryGetValue(currentKey, out string? storedHash)
-                            || storedHash != currentHash)
+                        if (i >= currentHashes.Count
+                            || !string.Equals(storedSequence[i].packageId, currentHashes[i].packageId, StringComparison.OrdinalIgnoreCase)
+                            || storedSequence[i].hash != currentHashes[i].hash)
                         {
                             valid = false;
                             break;
@@ -125,7 +128,6 @@ namespace FluxxField.DefLoadCache
 
                     if (valid)
                     {
-                        // Also verify the cache file exists
                         string cachePath = Path.Combine(CheckpointRoot,
                             $"checkpoint_{modIndex}.xml.gz");
                         if (File.Exists(cachePath))
@@ -187,30 +189,29 @@ namespace FluxxField.DefLoadCache
             catch { }
         }
 
-        private static Dictionary<string, string>? ParsePerModHashes(string json)
+        /// <summary>
+        /// Parses the ordered modSequence array from checkpoint meta.json.
+        /// Returns a list of (packageId, hash) in load order.
+        /// </summary>
+        private static List<(string packageId, string hash)>? ParseModSequence(string json)
         {
-            int keyIdx = json.IndexOf("\"perModHashes\"");
+            int keyIdx = json.IndexOf("\"modSequence\"");
             if (keyIdx < 0) return null;
 
-            int braceStart = json.IndexOf('{', keyIdx + "\"perModHashes\"".Length);
-            if (braceStart < 0) return null;
+            int bracketStart = json.IndexOf('[', keyIdx);
+            if (bracketStart < 0) return null;
 
-            int depth = 0;
-            int braceEnd = -1;
-            for (int i = braceStart; i < json.Length; i++)
-            {
-                if (json[i] == '{') depth++;
-                else if (json[i] == '}') { depth--; if (depth == 0) { braceEnd = i; break; } }
-            }
-            if (braceEnd < 0) return null;
+            int bracketEnd = json.IndexOf(']', bracketStart);
+            if (bracketEnd < 0) return null;
 
-            string inner = json.Substring(braceStart + 1, braceEnd - braceStart - 1);
-            var result = new Dictionary<string, string>();
+            string inner = json.Substring(bracketStart + 1, bracketEnd - bracketStart - 1);
+            var result = new List<(string, string)>();
 
-            var matches = Regex.Matches(inner, "\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
+            // Match {"id":"...","hash":"..."} objects
+            var matches = Regex.Matches(inner, "\"id\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"hash\"\\s*:\\s*\"([^\"]+)\"");
             foreach (Match m in matches)
             {
-                result[m.Groups[1].Value] = m.Groups[2].Value;
+                result.Add((m.Groups[1].Value, m.Groups[2].Value));
             }
 
             return result.Count > 0 ? result : null;
