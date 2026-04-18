@@ -18,5 +18,23 @@ namespace FluxxField.DefLoadCache.Tests
 
             Assert.False(string.IsNullOrEmpty(fragment));
         }
+
+        [Fact]
+        public void VersionScopedDllChange_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData><name>T</name></ModMetaData>");
+            mod.WriteFile("1.6/Assemblies/foo.dll", new byte[] { 0x01, 0x02 });
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.versioned", mod.RootDir, loadFolders);
+
+            mod.WriteFile("1.6/Assemblies/foo.dll", new byte[] { 0xAA, 0xBB });
+            string after = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.versioned", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
     }
 }

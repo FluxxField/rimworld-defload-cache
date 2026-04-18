@@ -136,13 +136,22 @@ namespace FluxxField.DefLoadCache
             sb.Append("mod=").Append(packageId).Append('\n');
             sb.Append("modversion=").Append(GetModVersionFromAbout(modRootDir)).Append('\n');
 
+            // Walk the actual load folders (e.g. "1.6/", "Common/") that RimWorld
+            // populates from LoadFolders.xml — not hardcoded paths — so version-
+            // scoped layouts fingerprint correctly.
             foreach (var folder in loadFolders)
             {
                 string folderLabel = RelativeLabel(modRootDir, folder);
-                AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
-                AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/defs",       Path.Combine(folder, "Defs"),       "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/patches",    Path.Combine(folder, "Patches"),    "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/assemblies", Path.Combine(folder, "Assemblies"), "*.dll");
             }
 
+            // Root-level Assemblies (legacy fallback for mods without version folders).
+            // Modern mods version-scope DLLs into <version>/Assemblies/, which is
+            // already walked above per load folder. DLL changes can introduce new
+            // PatchOperation subclasses or runtime-generated defs, so they must
+            // affect the fingerprint.
             AppendPerFileStats(sb, "assemblies", Path.Combine(modRootDir, "Assemblies"), "*.dll");
 
             return sb.ToString();
