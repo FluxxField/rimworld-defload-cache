@@ -47,9 +47,8 @@ namespace FluxxField.DefLoadCache.Tests
             string before = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.about", mod.RootDir, loadFolders);
 
-            // Change a non-modVersion attribute (e.g. add a dependency).
-            // Current code reads only <modVersion>, so this would NOT change the
-            // fragment until About.xml is fingerprinted as a whole file.
+            // About.xml is fingerprinted as a whole file, so any edit — including
+            // non-modVersion attributes like modDependencies — must change the fragment.
             mod.WriteAbout("<ModMetaData><name>T</name><modDependencies><li><packageId>x.y</packageId></li></modDependencies></ModMetaData>");
             string after = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.about", mod.RootDir, loadFolders);
