@@ -178,10 +178,11 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Appends per-file metadata (relative path, size, mtime) for every
-        /// file in a folder. Files are sorted by relative path for deterministic
-        /// ordering. More granular than folder-level aggregates since it catches
-        /// cases where files are added/removed but totals stay the same.
+        /// Appends per-file metadata (relative path, size, sha256-of-content) for
+        /// every file matching the search pattern. Sorted by relative path for
+        /// determinism. Content hashing replaces mtime so the fragment is invariant
+        /// to mtime-only changes (e.g., Steam re-downloads) and sensitive to true
+        /// content changes regardless of whether mtime updated.
         /// </summary>
         private static void AppendPerFileStats(StringBuilder sb, string label, string folderPath, string searchPattern)
         {
@@ -203,15 +204,26 @@ namespace FluxxField.DefLoadCache
                 string relativePath = RelativeLabel(folderPath, fi.FullName);
                 try
                 {
+                    string sha = ComputeFileSha256(fi.FullName);
                     sb.Append(label).Append(':').Append(relativePath)
                       .Append(",bytes:").Append(fi.Length)
-                      .Append(",mtime:").Append(fi.LastWriteTimeUtc.Ticks)
+                      .Append(",sha256:").Append(sha)
                       .Append('\n');
                 }
                 catch
                 {
                     sb.Append(label).Append(':').Append(relativePath).Append("=<error>\n");
                 }
+            }
+        }
+
+        private static string ComputeFileSha256(string path)
+        {
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(path))
+            {
+                byte[] hash = sha.ComputeHash(stream);
+                return BytesToHex(hash);
             }
         }
 

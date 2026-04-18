@@ -68,9 +68,6 @@ namespace FluxxField.DefLoadCache.Tests
             string before = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.root", mod.RootDir, loadFolders);
 
-            // Wait to ensure mtime changes (file system time resolution)
-            System.Threading.Thread.Sleep(10);
-
             mod.WriteFile("Assemblies/foo.dll", new byte[] { 0x99 });
             string after = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.root", mod.RootDir, loadFolders);
@@ -91,14 +88,12 @@ namespace FluxxField.DefLoadCache.Tests
                 "test.both", mod.RootDir, loadFolders);
 
             // Mutate legacy dll only -> fragment must change
-            System.Threading.Thread.Sleep(10);
             mod.WriteFile("Assemblies/legacy.dll", new byte[] { 0xAA });
             string afterLegacy = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.both", mod.RootDir, loadFolders);
             Assert.NotEqual(baseline, afterLegacy);
 
             // Mutate modern dll only (rest restored) -> fragment must change
-            System.Threading.Thread.Sleep(10);
             mod.WriteFile("Assemblies/legacy.dll", new byte[] { 0x01 });
             mod.WriteFile("1.6/Assemblies/modern.dll", new byte[] { 0xBB });
             string afterModern = ModlistFingerprint.BuildModFragmentFromDisk(
@@ -132,7 +127,6 @@ namespace FluxxField.DefLoadCache.Tests
             var loadFolders = new List<string> { mod.LoadFolder("1.6") };
             string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
-            System.Threading.Thread.Sleep(10);
             mod.WriteFile("1.6/Defs/Things.xml", "<Defs>v2-much-longer-content</Defs>");
             string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
@@ -149,7 +143,6 @@ namespace FluxxField.DefLoadCache.Tests
             var loadFolders = new List<string> { mod.LoadFolder("1.6") };
             string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
-            System.Threading.Thread.Sleep(10);
             mod.WriteFile("1.6/Patches/p.xml", "<Patch>updated content here</Patch>");
             string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
@@ -165,7 +158,6 @@ namespace FluxxField.DefLoadCache.Tests
             var loadFolders = new List<string> { mod.LoadFolder("1.6") };
             string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
-            System.Threading.Thread.Sleep(10);
             mod.WriteFile("1.6/Defs/NewFile.xml", "<Defs />");
             string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
@@ -182,8 +174,51 @@ namespace FluxxField.DefLoadCache.Tests
             var loadFolders = new List<string> { mod.LoadFolder("1.6") };
             string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
-            System.Threading.Thread.Sleep(10);
             System.IO.File.Delete(System.IO.Path.Combine(mod.RootDir, "1.6/Defs/ToDelete.xml"));
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void SameContentDifferentMtime_FragmentUnchanged()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs />");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            // Bump mtime without changing content (the Steam re-download case).
+            string defPath = System.IO.Path.Combine(mod.RootDir, "1.6/Defs/Things.xml");
+            System.IO.File.SetLastWriteTimeUtc(defPath, System.DateTime.UtcNow.AddHours(1));
+
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.Equal(before, after);
+        }
+
+        [Fact]
+        public void DifferentContentSameMtime_FragmentChanges()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            // Use same-length payloads so byteLength doesn't pick up the slack —
+            // this test is specifically about content-vs-content detection.
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs>v1</Defs>");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string defPath = System.IO.Path.Combine(mod.RootDir, "1.6/Defs/Things.xml");
+            var originalMtime = System.IO.File.GetLastWriteTimeUtc(defPath);
+
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            // Same length, different bytes (both writes use FakeModFolder.WriteFile
+            // which encodes UTF-8 without a BOM, so bytes:N is identical).
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs>v9</Defs>");
+            System.IO.File.SetLastWriteTimeUtc(defPath, originalMtime);
+
             string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
             Assert.NotEqual(before, after);
