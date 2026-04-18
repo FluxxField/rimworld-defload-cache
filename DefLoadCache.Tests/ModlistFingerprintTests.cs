@@ -223,5 +223,41 @@ namespace FluxxField.DefLoadCache.Tests
 
             Assert.NotEqual(before, after);
         }
+
+        [Fact]
+        public void TexturesFolderChange_FragmentUnchanged()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("Textures/icon.png", new byte[] { 0x01, 0x02, 0x03 });
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            // Modify the texture — should NOT affect the fragment, since textures
+            // are outside the def-loading pipeline.
+            mod.WriteFile("Textures/icon.png", new byte[] { 0xAA, 0xBB, 0xCC, 0xDD });
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.Equal(before, after);
+        }
+
+        [Fact]
+        public void LoadFolderReordering_ChangesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("1.6/Defs/A.xml", "<Defs />");
+            mod.WriteFile("Common/Defs/B.xml", "<Defs />");
+
+            string a = ModlistFingerprint.BuildModFragmentFromDisk(
+                "p.id", mod.RootDir,
+                new List<string> { mod.LoadFolder("Common"), mod.LoadFolder("1.6") });
+            string b = ModlistFingerprint.BuildModFragmentFromDisk(
+                "p.id", mod.RootDir,
+                new List<string> { mod.LoadFolder("1.6"), mod.LoadFolder("Common") });
+
+            Assert.NotEqual(a, b);
+        }
     }
 }
