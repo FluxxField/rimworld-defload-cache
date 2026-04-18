@@ -12,7 +12,7 @@ namespace FluxxField.DefLoadCache
     /// <summary>
     /// Computes a stable SHA256 hash of the active modlist's structural state.
     /// Inputs: RimWorld version + per-mod package/version + per-file metadata
-    /// (relative path, byte length, mtime) for every load-relevant file + cache
+    /// (relative path, byte length, sha256) for every load-relevant file + cache
     /// format version. Ordered by mod load order and file relative path.
     ///
     /// Per-mod fragments are collected in parallel for speed on large modlists
@@ -26,9 +26,11 @@ namespace FluxxField.DefLoadCache
     {
         /// <summary>
         /// Bump this when the cache format changes. All caches with a different
-        /// version are invalidated.
+        /// version are invalidated. v6: switched per-file fingerprint from
+        /// (bytes, mtime) to (bytes, sha256), added version-scoped Assemblies
+        /// walk, replaced modVersion-only About.xml read with full-file fingerprint.
         /// </summary>
-        public const int CacheFormatVersion = 5;
+        public const int CacheFormatVersion = 6;
 
         internal static string Compute()
         {
