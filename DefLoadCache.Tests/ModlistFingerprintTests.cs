@@ -30,7 +30,7 @@ namespace FluxxField.DefLoadCache.Tests
             string before = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.versioned", mod.RootDir, loadFolders);
 
-            mod.WriteFile("1.6/Assemblies/foo.dll", new byte[] { 0xAA, 0xBB });
+            mod.WriteFile("1.6/Assemblies/foo.dll", new byte[] { 0xAA, 0xBB, 0xCC });
             string after = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.versioned", mod.RootDir, loadFolders);
 
@@ -53,6 +53,138 @@ namespace FluxxField.DefLoadCache.Tests
             mod.WriteAbout("<ModMetaData><name>T</name><modDependencies><li><packageId>x.y</packageId></li></modDependencies></ModMetaData>");
             string after = ModlistFingerprint.BuildModFragmentFromDisk(
                 "test.about", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void RootScopedDllChange_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("Assemblies/foo.dll", new byte[] { 0x01 });
+
+            var loadFolders = new List<string>();
+            string before = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.root", mod.RootDir, loadFolders);
+
+            // Wait to ensure mtime changes (file system time resolution)
+            System.Threading.Thread.Sleep(10);
+
+            mod.WriteFile("Assemblies/foo.dll", new byte[] { 0x99 });
+            string after = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.root", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void BothRootAndVersionAssemblies_BothFingerprinted()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("Assemblies/legacy.dll", new byte[] { 0x01 });
+            mod.WriteFile("1.6/Assemblies/modern.dll", new byte[] { 0x02 });
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string baseline = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.both", mod.RootDir, loadFolders);
+
+            // Mutate legacy dll only -> fragment must change
+            System.Threading.Thread.Sleep(10);
+            mod.WriteFile("Assemblies/legacy.dll", new byte[] { 0xAA });
+            string afterLegacy = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.both", mod.RootDir, loadFolders);
+            Assert.NotEqual(baseline, afterLegacy);
+
+            // Mutate modern dll only (rest restored) -> fragment must change
+            System.Threading.Thread.Sleep(10);
+            mod.WriteFile("Assemblies/legacy.dll", new byte[] { 0x01 });
+            mod.WriteFile("1.6/Assemblies/modern.dll", new byte[] { 0xBB });
+            string afterModern = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.both", mod.RootDir, loadFolders);
+            Assert.NotEqual(baseline, afterModern);
+        }
+
+        [Fact]
+        public void IdenticalLayouts_ProduceIdenticalFragments()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData><name>X</name></ModMetaData>");
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs />");
+            mod.WriteFile("1.6/Patches/p.xml", "<Patch />");
+            mod.WriteFile("1.6/Assemblies/a.dll", new byte[] { 0x01 });
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string a = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+            string b = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.Equal(a, b);
+        }
+
+        [Fact]
+        public void DefsFileChange_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs>v1</Defs>");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            System.Threading.Thread.Sleep(10);
+            mod.WriteFile("1.6/Defs/Things.xml", "<Defs>v2-much-longer-content</Defs>");
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void PatchesFileChange_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("1.6/Patches/p.xml", "<Patch />");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            System.Threading.Thread.Sleep(10);
+            mod.WriteFile("1.6/Patches/p.xml", "<Patch>updated content here</Patch>");
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void FileAdded_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            System.Threading.Thread.Sleep(10);
+            mod.WriteFile("1.6/Defs/NewFile.xml", "<Defs />");
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
+
+        [Fact]
+        public void FileRemoved_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData />");
+            mod.WriteFile("1.6/Defs/ToDelete.xml", "<Defs />");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
+
+            System.Threading.Thread.Sleep(10);
+            System.IO.File.Delete(System.IO.Path.Combine(mod.RootDir, "1.6/Defs/ToDelete.xml"));
+            string after = ModlistFingerprint.BuildModFragmentFromDisk("p.id", mod.RootDir, loadFolders);
 
             Assert.NotEqual(before, after);
         }
