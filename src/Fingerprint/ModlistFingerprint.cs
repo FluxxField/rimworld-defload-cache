@@ -134,7 +134,7 @@ namespace FluxxField.DefLoadCache
             var sb = new StringBuilder();
 
             sb.Append("mod=").Append(packageId).Append('\n');
-            sb.Append("modversion=").Append(GetModVersionFromAbout(modRootDir)).Append('\n');
+            AppendPerFileStats(sb, "about", Path.Combine(modRootDir, "About"), "About.xml");
 
             // Walk the actual load folders (e.g. "1.6/", "Common/") that RimWorld
             // populates from LoadFolders.xml — not hardcoded paths — so version-
@@ -155,32 +155,6 @@ namespace FluxxField.DefLoadCache
             AppendPerFileStats(sb, "assemblies", Path.Combine(modRootDir, "Assemblies"), "*.dll");
 
             return sb.ToString();
-        }
-
-        private static string GetModVersionFromAbout(string modRootDir)
-        {
-            try
-            {
-                string aboutPath = Path.Combine(modRootDir, "About", "About.xml");
-                if (!File.Exists(aboutPath)) return "<no-about>";
-
-                using (var reader = System.Xml.XmlReader.Create(aboutPath))
-                {
-                    while (reader.Read())
-                    {
-                        if (reader.NodeType == System.Xml.XmlNodeType.Element
-                            && reader.LocalName == "modVersion")
-                        {
-                            return reader.ReadElementContentAsString().Trim();
-                        }
-                    }
-                }
-                return "<no-version>";
-            }
-            catch
-            {
-                return "<error>";
-            }
         }
 
         /// <summary>

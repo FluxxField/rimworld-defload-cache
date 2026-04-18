@@ -36,5 +36,25 @@ namespace FluxxField.DefLoadCache.Tests
 
             Assert.NotEqual(before, after);
         }
+
+        [Fact]
+        public void AboutXmlChange_InvalidatesFragment()
+        {
+            using var mod = new FakeModFolder();
+            mod.WriteAbout("<ModMetaData><name>T</name><modDependencies/></ModMetaData>");
+
+            var loadFolders = new List<string> { mod.LoadFolder("1.6") };
+            string before = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.about", mod.RootDir, loadFolders);
+
+            // Change a non-modVersion attribute (e.g. add a dependency).
+            // Current code reads only <modVersion>, so this would NOT change the
+            // fragment until About.xml is fingerprinted as a whole file.
+            mod.WriteAbout("<ModMetaData><name>T</name><modDependencies><li><packageId>x.y</packageId></li></modDependencies></ModMetaData>");
+            string after = ModlistFingerprint.BuildModFragmentFromDisk(
+                "test.about", mod.RootDir, loadFolders);
+
+            Assert.NotEqual(before, after);
+        }
     }
 }
