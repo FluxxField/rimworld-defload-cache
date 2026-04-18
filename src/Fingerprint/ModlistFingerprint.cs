@@ -115,47 +115,46 @@ namespace FluxxField.DefLoadCache
             return result;
         }
 
-        private static string BuildModFragment(ModContentPack mod)
+        private static string BuildModFragment(ModContentPack mod) =>
+            BuildModFragmentFromDisk(
+                mod.PackageId ?? "<no-id>",
+                mod.RootDir,
+                (IList<string>)(mod.foldersToLoadDescendingOrder ?? new List<string>()));
+
+        /// <summary>
+        /// Pure function: takes mod identity primitives and a list of load folders,
+        /// walks disk, returns a deterministic fingerprint fragment string. No
+        /// RimWorld types — testable in isolation.
+        /// </summary>
+        internal static string BuildModFragmentFromDisk(
+            string packageId,
+            string modRootDir,
+            IList<string> loadFolders)
         {
             var sb = new StringBuilder();
 
-            sb.Append("mod=").Append(mod.PackageId ?? "<no-id>").Append('\n');
-            sb.Append("modversion=").Append(GetModVersion(mod)).Append('\n');
+            sb.Append("mod=").Append(packageId).Append('\n');
+            sb.Append("modversion=").Append(GetModVersionFromAbout(modRootDir)).Append('\n');
 
-            // Walk the actual load folders (e.g. "1.6/", "Common/") instead
-            // of hardcoded root-level Defs/Patches. foldersToLoadDescendingOrder
-            // is populated from LoadFolders.xml and reflects what RimWorld
-            // actually loads.
-            var loadFolders = mod.foldersToLoadDescendingOrder;
-            if (loadFolders != null)
+            foreach (var folder in loadFolders)
             {
-                foreach (var folder in loadFolders)
-                {
-                    string folderLabel = RelativeLabel(mod.RootDir, folder);
-                    AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
-                    AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
-                }
+                string folderLabel = RelativeLabel(modRootDir, folder);
+                AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
             }
 
-            // Assemblies: DLL changes can introduce new PatchOperation
-            // subclasses or runtime-generated defs. Walk root Assemblies/
-            // since that's where RimWorld loads them from regardless of
-            // LoadFolders.xml.
-            AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            AppendPerFileStats(sb, "assemblies", Path.Combine(modRootDir, "Assemblies"), "*.dll");
 
             return sb.ToString();
         }
 
-        private static string GetModVersion(ModContentPack mod)
+        private static string GetModVersionFromAbout(string modRootDir)
         {
             try
             {
-                string aboutPath = Path.Combine(mod.RootDir, "About", "About.xml");
+                string aboutPath = Path.Combine(modRootDir, "About", "About.xml");
                 if (!File.Exists(aboutPath)) return "<no-about>";
 
-                // Forward-only XmlReader: reads until it finds <modVersion>,
-                // then stops. ~10x faster than XmlDocument.Load + XPath on
-                // 576 mods because it never builds a DOM.
                 using (var reader = System.Xml.XmlReader.Create(aboutPath))
                 {
                     while (reader.Read())
