@@ -114,4 +114,9 @@
     <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.UnscopedRefAttribute" />
   </ItemGroup>
 
+  <!-- Exclude test project from compilation -->
+  <ItemGroup>
+    <Compile Remove="DefLoadCache.Tests/**/*.cs" />
+  </ItemGroup>
+
 </Project>

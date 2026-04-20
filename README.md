@@ -91,14 +91,14 @@ DefLoadCache uses [Prepatcher](https://steamcommunity.com/sharedfiles/filedetail
 
 ### Cache Invalidation
 
-The fingerprint includes:
+The fingerprint is a SHA-256 hash computed over:
 - RimWorld version
-- Per-mod: packageId, version from `About.xml`
-- Per-mod: `Defs/`, `Patches/` file counts, total byte sizes, and **latest modification timestamps** (respecting `LoadFolders.xml` version-specific paths)
-- Per-mod: `Assemblies/*.dll` file counts, sizes, and modification timestamps
+- Per-mod: packageId from `About.xml`
+- Per-mod: `About/About.xml` — full file content hash
+- Per-mod: `Defs/*.xml`, `Patches/*.xml`, and `Assemblies/*.dll` for every load folder (root and version-scoped, respecting `LoadFolders.xml`). For each file: relative path, byte length, and SHA-256 content hash.
 - Cache format version
 
-Any change to any file, including same-size content edits (e.g., changing `cost=1000` to `cost=9000`), updates the file's modification timestamp, which changes the fingerprint and triggers a full cache rebuild.
+Any change to any file — including same-size content edits (e.g., changing `cost=1000` to `cost=9000`) — changes the file's SHA-256, flips the fingerprint, and triggers a rebuild. Because the fingerprint is content-based rather than timestamp-based, Steam workshop re-downloads that don't change file contents no longer invalidate the cache, and platform-specific filesystem timestamp quirks (ext4 vs NTFS vs FAT) are irrelevant.
 
 Any change to any of these causes a cache miss and full rebuild.
 
@@ -163,12 +163,14 @@ Uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Ceci
 DefLoadCache reduces launch time by ~71% on a 414-mod list (9:06 to 2:40) by caching mod XML loading and patch application. There's more on the table.
 
 ### Near-term improvements
-- ~~**Content-aware fingerprinting.**~~ **Done!** The fingerprint now includes file modification timestamps. Same-size content changes invalidate the cache automatically.
+- ~~**Content-aware fingerprinting.**~~ **Done!** The fingerprint uses per-file SHA-256 content hashing. Same-size content changes invalidate the cache automatically.
 - ~~**Post-load validation and self-healing.**~~ **Done!** The cache validates itself on every launch and automatically deletes bad caches.
 - ~~**Profile-aware cache pruning.**~~ **Done!** Caches are matched to saved mod list profiles. Tweaking a list replaces the old cache instead of creating duplicates.
-- **Per-file content checksums.** Maintain a persistent map of file path → mtime + content checksum. Only recompute checksums when a file's mtime changes. If Steam re-downloads a mod but the content is byte-for-byte identical, the checksum stays the same and the cache survives. Improves cache hit rates on large modlists where workshop mods get frequent metadata-only updates.
+- ~~**Per-file content checksums.**~~ **Done!** Per-file SHA-256 hashing replaces modification-timestamp tracking. Steam re-downloads that don't change file contents no longer invalidate the cache, and the fingerprint is platform-neutral (no more filesystem timestamp quirks between ext4/NTFS/FAT).
+- ~~**Version-scoped Assemblies walk.**~~ **Done!** The fingerprint now walks `Assemblies/*.dll` inside each load folder (e.g. `1.6/Assemblies/`), not only root-level `Assemblies/`. Closes a gap where rebuilds of version-scoped DLLs were invisible to the cache.
 - ~~**`ErrorCheckPatches` skip on cache hit.**~~ **Done!** Patch config validation is skipped on cache-hit launches, saving ~7 seconds on large modlists.
 - ~~**Binary cache format.**~~ **Done!** Cache now uses binary XML (XmlDictionaryWriter/Reader) instead of text XML for faster deserialization on cache-hit launches.
+- ~~**Unit test coverage for fingerprint logic.**~~ **Done!** xUnit project with 14 tests covering version-scoped DLL detection, content-hash semantics (mtime-only changes don't invalidate; content changes at same length do), load-folder ordering, and file add/remove.
 
 ### Phase 2: Checkpoint-based incremental rebuild (Experimental)
 

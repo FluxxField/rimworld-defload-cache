@@ -12,7 +12,7 @@ namespace FluxxField.DefLoadCache
     /// <summary>
     /// Computes a stable SHA256 hash of the active modlist's structural state.
     /// Inputs: RimWorld version + per-mod package/version + per-file metadata
-    /// (relative path, byte length, mtime) for every load-relevant file + cache
+    /// (relative path, byte length, sha256) for every load-relevant file + cache
     /// format version. Ordered by mod load order and file relative path.
     ///
     /// Per-mod fragments are collected in parallel for speed on large modlists
@@ -26,9 +26,11 @@ namespace FluxxField.DefLoadCache
     {
         /// <summary>
         /// Bump this when the cache format changes. All caches with a different
-        /// version are invalidated.
+        /// version are invalidated. v6: switched per-file fingerprint from
+        /// (bytes, mtime) to (bytes, sha256), added version-scoped Assemblies
+        /// walk, replaced modVersion-only About.xml read with full-file fingerprint.
         /// </summary>
-        public const int CacheFormatVersion = 5;
+        public const int CacheFormatVersion = 6;
 
         internal static string Compute()
         {
@@ -115,64 +117,46 @@ namespace FluxxField.DefLoadCache
             return result;
         }
 
-        private static string BuildModFragment(ModContentPack mod)
+        private static string BuildModFragment(ModContentPack mod) =>
+            BuildModFragmentFromDisk(
+                mod.PackageId ?? "<no-id>",
+                mod.RootDir,
+                (IList<string>)(mod.foldersToLoadDescendingOrder ?? new List<string>()));
+
+        /// <summary>
+        /// Pure function: takes mod identity primitives and a list of load folders,
+        /// walks disk, returns a deterministic fingerprint fragment string. No
+        /// RimWorld types — testable in isolation.
+        /// </summary>
+        internal static string BuildModFragmentFromDisk(
+            string packageId,
+            string modRootDir,
+            IList<string> loadFolders)
         {
             var sb = new StringBuilder();
 
-            sb.Append("mod=").Append(mod.PackageId ?? "<no-id>").Append('\n');
-            sb.Append("modversion=").Append(GetModVersion(mod)).Append('\n');
+            sb.Append("mod=").Append(packageId).Append('\n');
+            AppendPerFileStats(sb, "about", Path.Combine(modRootDir, "About"), "About.xml");
 
-            // Walk the actual load folders (e.g. "1.6/", "Common/") instead
-            // of hardcoded root-level Defs/Patches. foldersToLoadDescendingOrder
-            // is populated from LoadFolders.xml and reflects what RimWorld
-            // actually loads.
-            var loadFolders = mod.foldersToLoadDescendingOrder;
-            if (loadFolders != null)
+            // Walk the actual load folders (e.g. "1.6/", "Common/") that RimWorld
+            // populates from LoadFolders.xml — not hardcoded paths — so version-
+            // scoped layouts fingerprint correctly.
+            foreach (var folder in loadFolders)
             {
-                foreach (var folder in loadFolders)
-                {
-                    string folderLabel = RelativeLabel(mod.RootDir, folder);
-                    AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
-                    AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
-                }
+                string folderLabel = RelativeLabel(modRootDir, folder);
+                AppendPerFileStats(sb, folderLabel + "/defs",       Path.Combine(folder, "Defs"),       "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/patches",    Path.Combine(folder, "Patches"),    "*.xml");
+                AppendPerFileStats(sb, folderLabel + "/assemblies", Path.Combine(folder, "Assemblies"), "*.dll");
             }
 
-            // Assemblies: DLL changes can introduce new PatchOperation
-            // subclasses or runtime-generated defs. Walk root Assemblies/
-            // since that's where RimWorld loads them from regardless of
-            // LoadFolders.xml.
-            AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            // Root-level Assemblies (legacy fallback for mods without version folders).
+            // Modern mods version-scope DLLs into <version>/Assemblies/, which is
+            // already walked above per load folder. DLL changes can introduce new
+            // PatchOperation subclasses or runtime-generated defs, so they must
+            // affect the fingerprint.
+            AppendPerFileStats(sb, "assemblies", Path.Combine(modRootDir, "Assemblies"), "*.dll");
 
             return sb.ToString();
-        }
-
-        private static string GetModVersion(ModContentPack mod)
-        {
-            try
-            {
-                string aboutPath = Path.Combine(mod.RootDir, "About", "About.xml");
-                if (!File.Exists(aboutPath)) return "<no-about>";
-
-                // Forward-only XmlReader: reads until it finds <modVersion>,
-                // then stops. ~10x faster than XmlDocument.Load + XPath on
-                // 576 mods because it never builds a DOM.
-                using (var reader = System.Xml.XmlReader.Create(aboutPath))
-                {
-                    while (reader.Read())
-                    {
-                        if (reader.NodeType == System.Xml.XmlNodeType.Element
-                            && reader.LocalName == "modVersion")
-                        {
-                            return reader.ReadElementContentAsString().Trim();
-                        }
-                    }
-                }
-                return "<no-version>";
-            }
-            catch
-            {
-                return "<error>";
-            }
         }
 
         /// <summary>
@@ -196,10 +180,11 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Appends per-file metadata (relative path, size, mtime) for every
-        /// file in a folder. Files are sorted by relative path for deterministic
-        /// ordering. More granular than folder-level aggregates since it catches
-        /// cases where files are added/removed but totals stay the same.
+        /// Appends per-file metadata (relative path, size, sha256-of-content) for
+        /// every file matching the search pattern. Sorted by relative path for
+        /// determinism. Content hashing replaces mtime so the fragment is invariant
+        /// to mtime-only changes (e.g., Steam re-downloads) and sensitive to true
+        /// content changes regardless of whether mtime updated.
         /// </summary>
         private static void AppendPerFileStats(StringBuilder sb, string label, string folderPath, string searchPattern)
         {
@@ -221,15 +206,26 @@ namespace FluxxField.DefLoadCache
                 string relativePath = RelativeLabel(folderPath, fi.FullName);
                 try
                 {
+                    string sha = ComputeFileSha256(fi.FullName);
                     sb.Append(label).Append(':').Append(relativePath)
                       .Append(",bytes:").Append(fi.Length)
-                      .Append(",mtime:").Append(fi.LastWriteTimeUtc.Ticks)
+                      .Append(",sha256:").Append(sha)
                       .Append('\n');
                 }
                 catch
                 {
                     sb.Append(label).Append(':').Append(relativePath).Append("=<error>\n");
                 }
+            }
+        }
+
+        private static string ComputeFileSha256(string path)
+        {
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(path))
+            {
+                byte[] hash = sha.ComputeHash(stream);
+                return BytesToHex(hash);
             }
         }
 
