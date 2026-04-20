@@ -3,39 +3,105 @@
   <name>DefLoadCache</name>
   <author>FluxxField</author>
   <packageId>fluxxfield.defloadcache</packageId>
-  <modVersion>1.2.0</modVersion>
+  <modVersion>1.3.0</modVersion>
   <url>https://github.com/FluxxField/rimworld-defload-cache</url>
   <supportedVersions>
     <li>1.6</li>
   </supportedVersions>
-  <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
+  <description>DefLoadCache caches the result of RimWorld's XML def loading and patch application, so repeat launches with the same mod list skip the two slowest stages of startup.
 
-IMPORTANT: Your first launch after installing will be slightly slower than normal. This is because the mod needs to build the cache. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
+On a 414-mod list, this cuts launch time from ~9 minutes to ~2:40 after the first launch.
 
-Tested on a 414-mod load order: first launch is slightly slower than normal (~9:10) because it builds the cache. Every launch after that loads in ~2:40 (71% faster). When you change your mod list, the experimental incremental rebuild can cut rebuild time from 9 minutes to 3:29. Incremental rebuild time depends on where the changed mod sits in the load order.
+HOW RIMWORLD LOADS MODS
 
-Features:
-- Automatic cache invalidation when mods, RimWorld version, or DLLs change
-- Per-file fingerprinting catches any file change, even same-size content edits
-- Profile-aware cache management, keeps one cache per saved mod list profile
-- Binary XML cache format for fast deserialization on repeat launches
-- Skips unnecessary patch validation on cached launches
-- Configurable settings with per-feature toggles
-- Zero gameplay impact: only affects load time
+When RimWorld launches with mods, it runs through a pipeline of stages. The relevant ones for def loading:
 
-Experimental (opt-in via settings):
-- Checkpoint-based incremental rebuild. When you add a mod or a mod updates, the game loads the nearest valid checkpoint and replays only the remaining mods instead of rebuilding everything. Works best when building up a mod list. Removing a mod or reordering still triggers a full rebuild since checkpoints carry defs from all mods present when built.
+1. Mod discovery — scans Mods/ and Steam workshop for active mods
+2. Assembly load — loads each mod's DLLs
+3. LoadModXML — reads every Defs/*.xml file from every mod into memory
+4. CombineIntoUnifiedXML — merges all parsed XML into one XmlDocument
+5. ApplyPatches — runs every Patches/*.xml file via XPath against the unified doc
+6. ErrorCheckPatches — validates patches succeeded
+7. ParseAndProcessXML — converts XmlNode into typed Def objects
+8. ResolveReferences — links cross-def references
+9. Texture, audio, string loading — Unity loads mod assets
 
-Safety:
-- Pre-load cache validation verifies the cache file is intact before using it
-- Post-load validation verifies per-mod def counts against baseline
-- Self-healing: bad caches are automatically deleted and rebuilt
-- Full fallback coverage: every entry point has error handling, the mod should never crash the game
-- Memory-conscious: cache files stream directly to/from disk, no large memory allocations
-- One-click "Test without cache" button for isolating issues
-- Structured log output for modders reviewing player bug reports
+On a 414-mod list, stages 3 and 5 (LoadModXML + ApplyPatches) alone account for about 6 of the 9 minutes. They also produce the same result every launch if nothing changed.
 
-Requires Prepatcher by Zetrith.</description>
+WHAT DEFLOADCACHE DOES
+
+DefLoadCache skips stages 3, 5, 6, and 8 on cache-hit launches. It serializes the fully-patched XmlDocument to disk after a normal first launch, then streams the cached document back on subsequent launches in place of re-reading files and re-running patches.
+
+The cache invalidates automatically when anything affecting def content changes. A SHA-256 fingerprint is computed per file across every mod's Defs/, Patches/, Assemblies/, and About.xml. Any byte-level change to any of those files flips the fingerprint and forces a rebuild. Mod additions, removals, reorders, version changes, RimWorld updates, and DLL rebuilds all trigger rebuilds.
+
+Stages that still run every launch regardless of cache state: texture/audio/string loading, ParseAndProcessXML, ResolveReferences, Harmony patching, and static constructors. These account for the ~2:40 of launch time that remains on cache hits.
+
+PERFORMANCE
+
+Measured on a 414-mod Combat Extended milsim load order:
+
+- First launch (builds cache): ~9:10 — normal speed plus a few seconds to serialize
+- Subsequent launches (cache hit): ~2:40 — 71% faster
+- Cache size on disk: ~7 MB
+
+When anything changes (mod added, updated, removed, reordered), the next launch runs a full rebuild at ~9 minutes and the cycle starts again.
+
+Benefits most from an SSD and 16 GB+ RAM. Older hardware still works but sees smaller gains because the cache read is competing with other disk I/O.
+
+WHEN TO USE DEFLOADCACHE VS MISSILEGIRL
+
+MissileGirl is a comprehensive performance suite — Gagarin (XML def caching), RocketMan (stat/thing caching), Soyuz (pawn tick throttling), Cosmodrome (patch optimization), and a texture cache. If you want one mod that addresses many performance pain points at once, MissileGirl is generally the stronger pick. It does more than DefLoadCache does.
+
+DefLoadCache focuses on one thing: the XML def pipeline. It overlaps with Gagarin at that specific stage, so running both is redundant — disable "Enable Gagarin" in MissileGirl settings if you want DefLoadCache to handle XML caching. The rest of MissileGirl's subsystems (stat caching, pawn throttling, texture cache) don't touch XML loading and can run alongside DefLoadCache without issue.
+
+Pick DefLoadCache specifically if:
+- You want only the XML caching without MissileGirl's broader changes to stats, pawn ticks, patches, and textures. Smaller surface area means fewer interaction points with other mods.
+- You've hit compatibility issues with MissileGirl's non-XML subsystems.
+- You want the cache to persist as long as nothing changes. Gagarin auto-expires its cache after 2 days even if your mod list is untouched; DefLoadCache doesn't.
+
+COMPATIBILITY AT A GLANCE
+
+- FasterGameLoading (Taranchuk / mushroomTW continued): stackable. Operates on different pipeline stages (reflection caching, graphics deferral, atlas baking). FGL's own About.xml lists DefLoadCache under "works well with."
+- Image Opt (soeur): stackable. Operates on texture decoding only.
+- Performance Fish (bbradson): stackable, no known conflicts.
+- MissileGirl (ViralReaction): partial. Disable "Enable Gagarin" in MissileGirl's settings; other subsystems are fine to run alongside DefLoadCache.
+- HugsLib: stackable.
+- Harmony, Prepatcher: required dependencies.
+
+FREQUENTLY ASKED
+
+Q: Does this do the same thing as FasterGameLoading?
+A: No. FasterGameLoading optimizes runtime reflection, graphics deferral, and texture atlas baking. It doesn't cache parsed defs or patched XML to disk. DefLoadCache targets the XML loading and patch application stages specifically. They operate on different parts of the launch pipeline and can be installed together.
+
+Q: Does this do the same thing as MissileGirl / Gagarin?
+A: Same category (XML def caching), different implementations. Running both is redundant — disable "Enable Gagarin" in MissileGirl if you want DefLoadCache to handle the XML cache. See "When to use DefLoadCache vs MissileGirl" above.
+
+Q: Why did my cache invalidate after a Steam workshop update?
+A: On older versions, any file modification timestamp change triggered a rebuild, which included Steam re-downloads even when content was byte-identical. The current version uses SHA-256 content hashing, so a Steam update that doesn't actually change file contents no longer invalidates the cache.
+
+Q: Does this work on Linux?
+A: Yes. Earlier versions used file modification timestamps, which have inconsistent behavior across filesystems (ext4 vs NTFS vs FAT). The current version uses SHA-256 content hashing, which is platform-neutral.
+
+Q: Can it corrupt my save?
+A: No. DefLoadCache only affects how defs are loaded at game launch. It doesn't read or write save files. If loaded defs are wrong, you'd see errors at game startup, not after loading a save.
+
+Q: Can it break other mods?
+A: It shouldn't — the cached XmlDocument is byte-equivalent to what a normal launch produces. Every cache hit runs a validation check comparing per-mod def counts against a baseline. A mismatch triggers auto-delete and a clean rebuild on the next launch. If you're debugging another mod, click "Test without cache (next launch only)" in DefLoadCache's settings to isolate the issue.
+
+Q: I'm developing a mod. Will this interfere?
+A: The cache invalidates on any file change, so it'll just rebuild when you edit a Def or Patch. If you want to disable the cache entirely during development, toggle off "Skip reading mod files on repeat launches" in settings.
+
+Q: Where's the source code?
+A: https://github.com/FluxxField/rimworld-defload-cache. MIT licensed.
+
+REQUIREMENTS
+
+Prepatcher (by Zetrith) — required dependency, available on Steam Workshop.
+RimWorld 1.6.
+
+Place DefLoadCache anywhere in your mod list after Prepatcher and Harmony. First launch builds the cache at normal speed. Every launch after that is significantly faster.
+
+Full technical documentation, FAQ expansion, and the compatibility matrix for every RimWorld performance mod live on the GitHub repository.</description>
   <modDependencies>
     <li>
       <packageId>zetrith.prepatcher</packageId>
