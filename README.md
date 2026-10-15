@@ -175,7 +175,7 @@ Each build needs only its own version's game assemblies, referenced via `HintPat
 
 ## Development Notes
 
-The repository also contains a checkpoint-based incremental rebuild (save snapshots along the load order, replay only the mods after a change). It is compiled out (`DefLoadCacheSettings.ExperimentalEnabled = false`) and not part of any release: removing or reordering a mod always forces a full rebuild, and the gain didn't justify the extra disk use and risk.
+The repository also contains a checkpoint-based incremental rebuild (save snapshots along the load order, replay only the mods after a change). It is compiled out (`DefLoadCacheSettings.ExperimentalEnabled = false`) and not part of any release. Even when enabled, removing or reordering a mod forces a full rebuild.
 
 ## License
 
