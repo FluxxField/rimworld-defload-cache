@@ -20,3 +20,6 @@ DefLoadCache.local.props
 
 # Internal planning docs
 docs/superpowers/
+1.6/Assemblies/*.dll
+1.7/Assemblies/*.dll
+.worktrees/

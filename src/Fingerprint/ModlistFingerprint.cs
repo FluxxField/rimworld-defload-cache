@@ -134,14 +134,17 @@ namespace FluxxField.DefLoadCache
                     string folderLabel = RelativeLabel(mod.RootDir, folder);
                     AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
                     AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
+                    // Assemblies: DLL changes can introduce new PatchOperation
+                    // subclasses or runtime-generated defs. RimWorld loads
+                    // Assemblies/ from every load folder (e.g. "1.7/Assemblies"),
+                    // not just the mod root.
+                    AppendPerFileStats(sb, folderLabel + "/assemblies", Path.Combine(folder, "Assemblies"), "*.dll");
                 }
             }
-
-            // Assemblies: DLL changes can introduce new PatchOperation
-            // subclasses or runtime-generated defs. Walk root Assemblies/
-            // since that's where RimWorld loads them from regardless of
-            // LoadFolders.xml.
-            AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            else
+            {
+                AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            }
 
             return sb.ToString();
         }

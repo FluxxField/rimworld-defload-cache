@@ -2,16 +2,25 @@
 <!-- DefLoadCache.local.props is gitignored so your paths won't affect other contributors. -->
 <Project>
   <PropertyGroup>
+    <!-- ===== RimWorld 1.6 (dotnet build -f net48) ===== -->
     <!-- Path to RimWorld's Managed assemblies folder -->
     <!-- Windows: C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed -->
     <!-- Linux:   ~/.steam/steam/steamapps/common/RimWorld/RimWorldLinux64_Data/Managed -->
     <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed -->
     <RimWorldManaged>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed</RimWorldManaged>
 
-    <!-- Path to Prepatcher's workshop Assemblies folder (workshop ID 2934420800) -->
-    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies -->
-    <!-- Linux:   ~/.steam/steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
-    <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
-    <PrepatcherAssemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies</PrepatcherAssemblies>
+    <!-- Harmony mod (workshop 2009463077) 1.6 Assemblies folder -->
+    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077\1.6\Assemblies -->
+    <!-- Linux:   ~/.local/share/Steam/steamapps/workshop/content/294100/2009463077/1.6/Assemblies -->
+    <Harmony16Assemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077\1.6\Assemblies</Harmony16Assemblies>
+
+    <!-- ===== RimWorld 1.7 (dotnet build -f net10.0) ===== -->
+    <!-- Game root folder (1.7 has no *_Data/Managed; DLLs sit next to RimWorld.dll) -->
+    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\common\RimWorld -->
+    <!-- Linux:   ~/.local/share/Steam/steamapps/common/RimWorld -->
+    <RimWorld17Dir>C:\Program Files (x86)\Steam\steamapps\common\RimWorld</RimWorld17Dir>
+
+    <!-- Harmony mod (workshop 2009463077) 1.7 Assemblies folder -->
+    <Harmony17Assemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077\1.7\Assemblies</Harmony17Assemblies>
   </PropertyGroup>
 </Project>

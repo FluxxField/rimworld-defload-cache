@@ -1,28 +1,39 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Import local paths. Copy DefLoadCache.local.props.example to
-       DefLoadCache.local.props and set your RimWorld/Prepatcher paths. -->
+       DefLoadCache.local.props and set your RimWorld/Harmony paths. -->
   <Import Project="DefLoadCache.local.props" Condition="Exists('DefLoadCache.local.props')" />
 
+  <!-- One source tree, one build per RimWorld version. Build each with -f:
+         dotnet build -c Release -f net48     → 1.6/Assemblies (Unity/Mono)
+         dotnet build -c Release -f net10.0   → 1.7/Assemblies (Waylith/.NET 10)
+       Both hook the load pipeline with Harmony (src/Hook/LoadPipelineHooks.cs).
+       Each build needs only its own version's game assemblies on disk. -->
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <RootNamespace>FluxxField.DefLoadCache</RootNamespace>
     <AssemblyName>DefLoadCache</AssemblyName>
-    <OutputPath>Assemblies\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ===== RimWorld 1.6 (Unity, Mono) ===== -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <OutputPath>1.6\Assemblies\</OutputPath>
+    <DefineConstants>$(DefineConstants);RW16</DefineConstants>
 
     <!-- Default paths if no local.props file exists (WSL with standard Steam install) -->
     <RimWorldManaged Condition="'$(RimWorldManaged)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed</RimWorldManaged>
-    <PrepatcherAssemblies Condition="'$(PrepatcherAssemblies)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies</PrepatcherAssemblies>
+    <!-- Harmony mod (workshop 2009463077) 1.6 folder -->
+    <Harmony16Assemblies Condition="'$(Harmony16Assemblies)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2009463077/1.6/Assemblies</Harmony16Assemblies>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- RimWorld game assemblies -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <Reference Include="Assembly-CSharp">
       <HintPath>$(RimWorldManaged)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
@@ -39,79 +50,43 @@
       <HintPath>$(RimWorldManaged)/UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
-    <!-- 0Harmony.dll from Prepatcher's workshop folder. This is the EXACT DLL
-         Prepatcher loads at runtime, so compile-time type identity matches
-         runtime. Bundled Mono.Cecil and MonoMod.Utils types live inside this
-         DLL as internal types; Krafs.Publicizer (below) publicizes them. -->
     <Reference Include="0Harmony">
-      <HintPath>$(PrepatcherAssemblies)/0Harmony.dll</HintPath>
+      <HintPath>$(Harmony16Assemblies)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
-
-    <!-- Prepatcher's [FreePatch] attribute API -->
-    <Reference Include="0PrepatcherAPI">
-      <HintPath>$(PrepatcherAssemblies)/0PrepatcherAPI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-
-    <!-- Publicizer: rewrites 0Harmony.dll at compile time to make its internal
-         Mono.Cecil and MonoMod.Utils types publicly accessible. This is how
-         Performance Fish solves the same CS0122 problem. -->
-    <PackageReference Include="Krafs.Publicizer" Version="2.*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Publicize 0Harmony's internal types so we can use Mono.Cecil.ModuleDefinition
-         etc. directly from our FreePatch method. -->
-    <Publicize Include="0Harmony" IncludeVirtualMembers="false" />
+  <!-- ===== RimWorld 1.7 (Waylith, .NET 10) ===== -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <OutputPath>1.7\Assemblies\</OutputPath>
+    <DefineConstants>$(DefineConstants);RW17</DefineConstants>
 
-    <!-- DoNotPublicize: .NET base types bundled inside 0Harmony via ILRepack that
-         would collide with mscorlib/System.* if made public. Mirrors the
-         exclusion list from bbradson/Performance-Fish.
-         NOTE: Mono.Collections.Generic.Collection`1 is intentionally NOT excluded.
-         IlInjector needs Count and the indexer on Cecil's InstructionCollection,
-         which inherits from this type. It lives in the Mono.* namespace (not
-         System.*), so it doesn't collide with mscorlib types. -->
-    <DoNotPublicize Include="0Harmony:System.Memory`1" />
-    <DoNotPublicize Include="0Harmony:System.ReadOnlyMemory`1" />
-    <DoNotPublicize Include="0Harmony:System.Span`1" />
-    <DoNotPublicize Include="0Harmony:System.ReadOnlySpan`1" />
-    <DoNotPublicize Include="0Harmony:System.ThrowHelper" />
-    <DoNotPublicize Include="0Harmony:System.HashCode" />
-    <DoNotPublicize Include="0Harmony:System.StringExtensions" />
-    <DoNotPublicize Include="0Harmony:System.MemoryExtensions" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.DefaultInterpolatedStringHandler" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IgnoresAccessChecksToAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsByRefLikeAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsExternalInit" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.IsReadOnlyAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NativeIntegerAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullableAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullableContextAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.NullablePublicOnlyAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.RefSafetyRulesAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.ModuleInitializerAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.ITuple" />
-    <DoNotPublicize Include="0Harmony:System.Runtime.CompilerServices.Unsafe" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.AllowNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DisallowNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.ExtraDynamicallyAccessedMemberTypes" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MaybeNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute" />
-    <DoNotPublicize Include="0Harmony:System.Diagnostics.CodeAnalysis.UnscopedRefAttribute" />
+    <!-- Default paths if no local.props file exists (Linux native Steam install).
+         1.7 ships its assemblies at the game root; there is no *_Data/Managed. -->
+    <RimWorld17Dir Condition="'$(RimWorld17Dir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/RimWorld</RimWorld17Dir>
+    <!-- Harmony mod (workshop 2009463077) 1.7 folder: Harmony 3.x built for .NET 10 -->
+    <Harmony17Assemblies Condition="'$(Harmony17Assemblies)' == ''">$(HOME)/.local/share/Steam/steamapps/workshop/content/294100/2009463077/1.7/Assemblies</Harmony17Assemblies>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <!-- UnityStubs.dll provides the UnityEngine types (Rect, GUI, Vector2...)
+         that 1.6-era code compiles against; Waylith.dll backs them. -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorld17Dir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityStubs">
+      <HintPath>$(RimWorld17Dir)/UnityStubs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Waylith">
+      <HintPath>$(RimWorld17Dir)/Waylith.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Harmony17Assemblies)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
