@@ -9,34 +9,27 @@
     <li>1.6</li>
     <li>1.7</li>
   </supportedVersions>
-  <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
+  <description>Caches the result of RimWorld's mod XML loading and patching, so launches with an unchanged mod list skip that work.
 
-IMPORTANT: Your first launch after installing will be slightly slower than normal. This is because the mod needs to build the cache. Every launch after that with the same mod list will be significantly faster. Don't judge the mod by the first launch.
+WHAT IT DOES
+On startup, RimWorld reads every mod's XML files and applies every XML patch, from scratch, every launch. DefLoadCache saves the finished, patched result to disk. On the next launch with the same mod list, it loads that saved result instead of reading the files and running the patches again.
 
-Tested on a 414-mod load order: first launch is slightly slower than normal (~9:10) because it builds the cache. Every launch after that loads in ~2:40 (71% faster). When you change your mod list, the experimental incremental rebuild can cut rebuild time from 9 minutes to 3:29. Incremental rebuild time depends on where the changed mod sits in the load order.
+The first launch with a new or changed mod list runs normally and builds the cache, so it is slightly slower. Launches after that are faster. How much faster depends on how many mods you have, how many XML patches they use, and your disk speed. On a 414-mod list under RimWorld 1.6, launches went from about 9 minutes to about 2:40.
 
-Features:
-- Automatic cache invalidation when mods, RimWorld version, or DLLs change
-- Per-file fingerprinting catches any file change, even same-size content edits
-- Profile-aware cache management, keeps one cache per saved mod list profile
-- Binary XML cache format for fast deserialization on repeat launches
-- Skips unnecessary patch validation on cached launches
-- Configurable settings with per-feature toggles
-- Zero gameplay impact: only affects load time
+HOW IT WORKS
+- The cache is keyed to your exact mod list: load order, mod versions, every Defs/Patches/Assemblies file, and the RimWorld version. Any change rebuilds it automatically.
+- Each mod list profile keeps its own cache.
+- Before using a cache, the mod checks that the file is intact and that the def counts match. A bad cache is deleted and rebuilt, and the game loads normally.
+- Only startup loading is affected. Gameplay, defs and saves are unchanged, and you can add or remove the mod at any time.
+- Options > Mod Settings > DefLoadCache shows cache status and has buttons to clear the cache or launch once without it.
 
-Experimental (opt-in via settings):
-- Checkpoint-based incremental rebuild. When you add a mod or a mod updates, the game loads the nearest valid checkpoint and replays only the remaining mods instead of rebuilding everything. Works best when building up a mod list. Removing a mod or reordering still triggers a full rebuild since checkpoints carry defs from all mods present when built.
-
-Safety:
-- Pre-load cache validation verifies the cache file is intact before using it
-- Post-load validation verifies per-mod def counts against baseline
-- Self-healing: bad caches are automatically deleted and rebuilt
-- Full fallback coverage: every entry point has error handling, the mod should never crash the game
-- Memory-conscious: cache files stream directly to/from disk, no large memory allocations
-- One-click "Test without cache" button for isolating issues
-- Structured log output for modders reviewing player bug reports
-
-Requirements: on RimWorld 1.6, requires Prepatcher by Zetrith. On RimWorld 1.7, requires Harmony (Prepatcher is not needed).</description>
+COMPATIBILITY
+- RimWorld 1.7: requires Harmony.
+- RimWorld 1.6: requires Prepatcher.
+- Works alongside texture/asset loading mods (such as Faster Game Loading) and runtime performance mods; they speed up different parts of the game.
+- Mod settings are not tracked. If another mod's settings turn its XML patches on or off, use "Clear all cached data" in DefLoadCache's settings after changing them.
+- Mods that generate or change def XML from code during loading, instead of through normal Defs and Patches files, may not be reflected in the cache.
+- If you are reporting a bug to another mod's author, reproduce it with "Test without cache" first.</description>
   <modDependenciesByVersion>
     <v1.6>
       <li>
