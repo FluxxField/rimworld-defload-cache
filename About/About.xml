@@ -36,7 +36,7 @@ COMPATIBILITY
 - RimWorld 1.6: requires Prepatcher.
 - Works alongside texture/asset loading mods (such as Faster Game Loading) and runtime performance mods; they speed up different parts of the game.
 - MissileGirl: turn off its XML cache (Gagarin) first. Both mods cache the same loading step.
-- Not compatible with Visual XML Patches: on cached launches patches aren't applied, so it has nothing to show. Use "Test without cache" for a launch when you need it.
+- Not compatible with Visual XML Patches (by Mlie): on cached launches patches aren't applied, so it has nothing to show. Disable DefLoadCache while you use it, or use "Test without cache" for one launch.
 
 KNOWN LIMITATIONS
 - Mod settings are not tracked. If another mod's settings turn its XML patches on or off, use "Clear all cached data" in DefLoadCache's settings after changing them.
@@ -63,4 +63,9 @@ KNOWN LIMITATIONS
     <li>zetrith.prepatcher</li>
     <li>brrainz.harmony</li>
   </loadAfter>
+  <!-- Visual XML Patches shows patches as they apply; on cached launches
+       none apply, so it shows nothing. -->
+  <incompatibleWith>
+    <li>Mlie.VisualXMLPatches</li>
+  </incompatibleWith>
 </ModMetaData>

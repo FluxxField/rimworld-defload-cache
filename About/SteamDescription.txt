@@ -50,7 +50,7 @@ Works alongside:
 [/list]
 Not compatible:
 [list]
-[*] [b]Visual XML Patches[/b]: it shows patches as they are applied. On cached launches patches aren't applied, so it has nothing to show. Use "Test without cache (next launch only)" for a launch when you need it.
+[*] [b][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3570531169]Visual XML Patches[/url][/b] by Mlie: it shows patches as they are applied. On cached launches patches aren't applied, so it has nothing to show. Disable DefLoadCache while you use it, or use "Test without cache (next launch only)" for one launch. RimWorld's mod list flags the two as incompatible.
 [/list]
 
 [h2]Known limitations[/h2]
