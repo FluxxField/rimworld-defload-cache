@@ -49,14 +49,15 @@ Tested on a 414-mod Combat Extended milsim load order:
 
 ## Requirements
 
-- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800).** Required dependency. DefLoadCache uses Prepatcher's `[FreePatch]` system to inject IL into the mod loading pipeline.
-- **RimWorld 1.6**
+- **RimWorld 1.6 or 1.7**
+- **RimWorld 1.7:** [Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077). Prepatcher is **not** needed on 1.7.
+- **RimWorld 1.6:** [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800). DefLoadCache uses Prepatcher's `[FreePatch]` system to inject IL into the mod loading pipeline.
 
 ## Installation
 
-1. Install [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800) from Steam Workshop
+1. Install [Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077) (1.7) or [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800) (1.6) from Steam Workshop
 2. Install DefLoadCache
-3. Place DefLoadCache anywhere in your mod list (after Prepatcher and Harmony)
+3. Place DefLoadCache anywhere in your mod list (after Harmony / Prepatcher)
 4. Launch RimWorld. The first launch builds the cache (normal speed), subsequent launches are faster
 
 ## Settings
@@ -73,7 +74,12 @@ Access via **Options > Mod Settings > DefLoadCache**:
 
 ## How It Works
 
-DefLoadCache uses [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)'s `[FreePatch]` API to inject IL instructions into RimWorld's mod loading pipeline at compile time (before the CLR verifies `Assembly-CSharp.dll`). This allows intercepting methods that are normally inaccessible to Harmony.
+DefLoadCache intercepts four methods in RimWorld's mod loading pipeline (`LoadedModManager.LoadModXML`, `ErrorCheckPatches`, `ApplyPatches`, `ClearCachedPatches`). All four run after mod classes are constructed, so the hooks are installed before they first execute.
+
+- **RimWorld 1.7:** plain Harmony prefixes, installed from the mod's constructor (`src/Hook/LoadPipelineHooks.cs`).
+- **RimWorld 1.6:** [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)'s `[FreePatch]` API rewrites the same four methods in `Assembly-CSharp.dll` before it loads (`src/Prepatcher/IlInjector.cs`).
+
+Both call the same entry points in `CacheHook`, so cache behavior is identical across versions.
 
 ### Cache Pipeline
 
@@ -148,15 +154,21 @@ DefLoadCache includes a built-in diagnostic dump tool. When enabled in settings,
 git clone https://github.com/FluxxField/rimworld-defload-cache.git
 cd rimworld-defload-cache
 
-# Build (requires .NET SDK, references RimWorld assemblies via HintPath)
-dotnet build -c Release
+# Build for RimWorld 1.7 (requires .NET 10 SDK)
+dotnet build -c Release -f net10.0   # Output: 1.7/Assemblies/DefLoadCache.dll
 
-# Output: Assemblies/DefLoadCache.dll
+# Build for RimWorld 1.6 (requires a RimWorld 1.6 install + Prepatcher)
+dotnet build -c Release -f net48     # Output: 1.6/Assemblies/DefLoadCache.dll
 ```
 
-The `.csproj` references RimWorld's `Assembly-CSharp.dll`, `UnityEngine.CoreModule.dll`, and Prepatcher's `0Harmony.dll` + `0PrepatcherAPI.dll` via `HintPath`. You may need to adjust these paths for your installation.
+Each build needs only its own version's game assemblies, referenced via `HintPath`. Copy `DefLoadCache.local.props.example` to `DefLoadCache.local.props` to set paths for your machine:
 
-Uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Cecil types bundled inside `0Harmony.dll` (the same approach used by [Performance Fish](https://github.com/bbradson/Performance-Fish)).
+- **1.7:** `Assembly-CSharp.dll`, `UnityStubs.dll`, `Waylith.dll` from the game root, and `0Harmony.dll` from the Harmony mod's `1.7/Assemblies`.
+- **1.6:** `Assembly-CSharp.dll` + Unity modules from `RimWorldWin64_Data/Managed`, and Prepatcher's `0Harmony.dll` + `0PrepatcherAPI.dll`.
+
+`LoadFolders.xml` makes each RimWorld version load only its own `1.x/Assemblies`. When packaging, the mod root must not contain an `Assemblies/` folder.
+
+The 1.6 build uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Cecil types bundled inside `0Harmony.dll` (the same approach used by [Performance Fish](https://github.com/bbradson/Performance-Fish)).
 
 ## Roadmap
 

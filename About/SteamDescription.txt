@@ -81,9 +81,10 @@ Access via [b]Options > Mod Settings > DefLoadCache[/b]:
 
 [h2]Requirements[/h2]
 [list]
-[*] [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800]Prepatcher[/url] (required)
-[*] RimWorld 1.6
-[*] Place anywhere in your mod list (after Prepatcher and Harmony)
+[*] RimWorld 1.6 or 1.7
+[*] RimWorld 1.7: [url=https://steamcommunity.com/workshop/filedetails/?id=2009463077]Harmony[/url] (required). Prepatcher is NOT needed on 1.7.
+[*] RimWorld 1.6: [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800]Prepatcher[/url] (required)
+[*] Place anywhere in your mod list (after Harmony / Prepatcher)
 [/list]
 
 [h2]Source Code[/h2]
