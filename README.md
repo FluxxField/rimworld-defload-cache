@@ -50,14 +50,13 @@ Tested on a 414-mod Combat Extended milsim load order:
 ## Requirements
 
 - **RimWorld 1.6 or 1.7**
-- **RimWorld 1.7:** [Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077). Prepatcher is **not** needed on 1.7.
-- **RimWorld 1.6:** [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800). DefLoadCache uses Prepatcher's `[FreePatch]` system to inject IL into the mod loading pipeline.
+- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077).** Prepatcher is no longer needed as of 1.3.0.
 
 ## Installation
 
-1. Install [Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077) (1.7) or [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800) (1.6) from Steam Workshop
+1. Install [Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077) from Steam Workshop
 2. Install DefLoadCache
-3. Place DefLoadCache anywhere in your mod list (after Harmony / Prepatcher)
+3. Place DefLoadCache anywhere in your mod list after Harmony
 4. Launch RimWorld. The first launch builds the cache (normal speed), subsequent launches are faster
 
 ## Settings
@@ -76,10 +75,9 @@ Access via **Options > Mod Settings > DefLoadCache**:
 
 DefLoadCache intercepts four methods in RimWorld's mod loading pipeline (`LoadedModManager.LoadModXML`, `ErrorCheckPatches`, `ApplyPatches`, `ClearCachedPatches`). All four run after mod classes are constructed, so the hooks are installed before they first execute.
 
-- **RimWorld 1.7:** plain Harmony prefixes, installed from the mod's constructor (`src/Hook/LoadPipelineHooks.cs`).
-- **RimWorld 1.6:** [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)'s `[FreePatch]` API rewrites the same four methods in `Assembly-CSharp.dll` before it loads (`src/Prepatcher/IlInjector.cs`).
+The hooks are plain Harmony prefixes, installed from the mod's constructor (`src/Hook/LoadPipelineHooks.cs`), on both 1.6 and 1.7. They call the entry points in `CacheHook`.
 
-Both call the same entry points in `CacheHook`, so cache behavior is identical across versions.
+Versions before 1.3.0 used [Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)'s `[FreePatch]` IL injection instead. That was dropped because Prepatcher scans every mod DLL in the load order, and crashes the launch when a mod has an optional dependency that isn't installed (seen with Star Ring Corporation without Humanoid Alien Races).
 
 ### Cache Pipeline
 
@@ -157,18 +155,16 @@ cd rimworld-defload-cache
 # Build for RimWorld 1.7 (requires .NET 10 SDK)
 dotnet build -c Release -f net10.0   # Output: 1.7/Assemblies/DefLoadCache.dll
 
-# Build for RimWorld 1.6 (requires a RimWorld 1.6 install + Prepatcher)
+# Build for RimWorld 1.6 (requires a RimWorld 1.6 install)
 dotnet build -c Release -f net48     # Output: 1.6/Assemblies/DefLoadCache.dll
 ```
 
 Each build needs only its own version's game assemblies, referenced via `HintPath`. Copy `DefLoadCache.local.props.example` to `DefLoadCache.local.props` to set paths for your machine:
 
 - **1.7:** `Assembly-CSharp.dll`, `UnityStubs.dll`, `Waylith.dll` from the game root, and `0Harmony.dll` from the Harmony mod's `1.7/Assemblies`.
-- **1.6:** `Assembly-CSharp.dll` + Unity modules from `RimWorldWin64_Data/Managed`, and Prepatcher's `0Harmony.dll` + `0PrepatcherAPI.dll`.
+- **1.6:** `Assembly-CSharp.dll` + Unity modules from `RimWorldWin64_Data/Managed`, and `0Harmony.dll` from the Harmony mod's `1.6/Assemblies`.
 
 `LoadFolders.xml` makes each RimWorld version load only its own `1.x/Assemblies`. When packaging, the mod root must not contain an `Assemblies/` folder.
-
-The 1.6 build uses [Krafs.Publicizer](https://github.com/krafs/Publicizer) to access Mono.Cecil types bundled inside `0Harmony.dll` (the same approach used by [Performance Fish](https://github.com/bbradson/Performance-Fish)).
 
 ## Roadmap
 
@@ -209,7 +205,7 @@ Currently behind an experimental flag (off by default). Enable in Mod Settings u
 
 ### Other potential features
 - **Cached parsed Def objects.** Skip `ParseAndProcessXML` and cross-reference resolution entirely by caching the built `DefDatabase` object graph. This is where the remaining ~3 minutes lives, but requires serializing arbitrary C# objects with cross-references. Research-level complexity.
-- **Prepatcher-based profiler with mod attribution.** A runtime profiler that uses Cecil to instrument Harmony-patched methods and attribute per-tick cost to specific mods. Reuses the Prepatcher + Cecil infrastructure from DefLoadCache.
+- **Prepatcher-based profiler with mod attribution.** A runtime profiler that uses Cecil to instrument Harmony-patched methods and attribute per-tick cost to specific mods.
 
 ### Compatibility notes
 
@@ -227,7 +223,6 @@ MIT
 
 - **FluxxField.** Author
 - **[CriDos](https://github.com/CriDos/rimworld-defload-cache)** (Maxim G.) Per-file fingerprinting, streaming hash, and ErrorCheckPatches skip.
-- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077)** by Brrainz. The patching library that Prepatcher and most RimWorld mods are built on.
-- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** by Zetrith. The `[FreePatch]` IL injection system that makes this possible. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
-- **[Krafs.Publicizer](https://github.com/krafs/Publicizer).** Compile-time publicizer for accessing internal Cecil types
-- **[Performance Fish](https://github.com/bbradson/Performance-Fish)** by bbradson. Inspiration for the Publicizer + HintPath pattern
+- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077)** by Brrainz. The patching library DefLoadCache hooks the loading pipeline with.
+- **[Prepatcher](https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800)** by Zetrith. Its `[FreePatch]` IL injection powered versions before 1.3.0. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
+- **[Krafs.Publicizer](https://github.com/krafs/Publicizer)** and **[Performance Fish](https://github.com/bbradson/Performance-Fish)** by bbradson. The build setup for versions before 1.3.0.

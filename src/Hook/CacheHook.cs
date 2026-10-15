@@ -9,18 +9,12 @@ using Verse;
 namespace FluxxField.DefLoadCache
 {
     /// <summary>
-    /// Static entry points called from IL injected by IlInjector.
+    /// Static entry points called by LoadPipelineHooks' Harmony prefixes.
     ///
-    /// Stage A: HookFired logs that ApplyPatches was entered.
-    /// Stage B: HookFired also computes and stashes the modlist fingerprint.
-    /// Stage C: SaveToCache (postfix) stamps mod attribution, serializes the
-    ///          merged doc, and writes the cache to disk.
-    /// Stage D: TryLoadCached (prefix) checks for a cache file matching the
-    ///          current fingerprint. On hit, replaces the working XmlDocument
-    ///          with the cached version, rebuilds assetlookup from the
-    ///          embedded attribution attributes, and returns true. The
-    ///          injected brtrue then branches past the original body AND
-    ///          SaveToCache directly to ret.
+    /// SaveToCache (miss) stamps mod attribution, serializes the merged doc,
+    /// and writes the cache to disk. TryLoadCached (hit) replaces the working
+    /// XmlDocument with the cached version and rebuilds assetlookup from the
+    /// embedded attribution attributes; patching and saving are then skipped.
     /// </summary>
     public static class CacheHook
     {
@@ -42,18 +36,17 @@ namespace FluxxField.DefLoadCache
         private static readonly Stopwatch _pipelineSw = new Stopwatch();
 
         /// <summary>
-        /// Called by injected IL at the top of LoadModXML (Stage G). Computes
+        /// Prefix on LoadModXML (Stage G). Computes
         /// the fingerprint early and checks if a cache file exists. If yes,
-        /// returns true. The injected brtrue skips LoadModXML's body and
+        /// returns true; the prefix then skips LoadModXML's body and
         /// returns an empty List, so LoadModXML + CombineIntoUnifiedXML are
         /// effectively no-ops. The cached doc is loaded later in TryLoadCached.
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipLoadModXML)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         /// <summary>
         /// Complete replacement for the vanilla ApplyPatches method body.
-        /// Called by the IL injector which replaces the entire method with
-        /// a single call to this. All logic lives here in managed C# instead
+        /// The ApplyPatches prefix calls this and skips the original. All logic lives here in managed C# instead
         /// of fragile IL injection.
         ///
         /// On cache hit: loads cached data, skips everything.
@@ -62,7 +55,7 @@ namespace FluxxField.DefLoadCache
         /// then saves the cache. The per-mod loop gives us a natural
         /// boundary for future checkpoint support.
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ApplyPatchesReplacement)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         public static void ApplyPatchesReplacement(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
@@ -224,44 +217,9 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Called by injected IL at the top of ApplyPatches. On Stage G hit,
-        /// fingerprint is already computed, so it just logs entry. On Stage G miss,
-        /// computes the fingerprint here (same as before Stage G existed).
-        ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.HookFired)</c>.
-        /// </summary>
-        public static void HookFired()
-        {
-            try
-            {
-                // If Stage G already computed the fingerprint and started the
-                // pipeline stopwatch, don't restart. Just log entry.
-                if (_currentFingerprint != null)
-                {
-                    return;
-                }
-
-                _pipelineSw.Restart();
-
-                var sw = Stopwatch.StartNew();
-                _currentFingerprint = ModlistFingerprint.Compute();
-                sw.Stop();
-
-                Log.Message($"Fingerprint computed in {sw.ElapsedMilliseconds}ms: {_currentFingerprint}");
-            }
-            catch (Exception ex)
-            {
-                Log.Error("HookFired threw, falling back to no-op", ex);
-                _currentFingerprint = null;
-            }
-        }
-
-        /// <summary>
-        /// Called by injected IL immediately after HookFired. Returns true if
-        /// a valid cache file exists for the current fingerprint; the
-        /// injected brtrue then branches past the original body and
-        /// SaveToCache directly to ret. Returns false on miss; execution
-        /// falls through to the normal ApplyPatches body.
+        /// Called by ApplyPatchesReplacement. Returns true if
+        /// a valid cache file exists for the current fingerprint, in which
+        /// case patching and SaveToCache are skipped. Returns false on miss.
         ///
         /// On hit: mutates xmlDoc in place (RemoveAll + ImportNode from cached
         /// doc) and rebuilds assetlookup from the embedded data-defloadcache-mod
@@ -269,7 +227,7 @@ namespace FluxxField.DefLoadCache
         /// assetlookup (LoadableXmlAsset's fields are readonly so we can't
         /// construct synthetic instances).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.TryLoadCached)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         public static bool TryLoadCached(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
@@ -399,13 +357,13 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Called by injected IL at the top of ErrorCheckPatches. On cache-hit
+        /// Prefix on ErrorCheckPatches. On cache-hit
         /// runs, patch config validation is wasted work since ApplyPatches will
         /// be skipped entirely. Saves ~7 seconds on large modlists.
         ///
         /// Based on work by CriDos (https://github.com/CriDos/rimworld-defload-cache).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipErrorCheckPatches)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         public static bool ShouldSkipErrorCheckPatches()
         {
@@ -441,12 +399,12 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Called by injected IL at the top of ClearCachedPatches. Returns true
-        /// on cache-hit runs so the injected brtrue skips the entire method body,
+        /// Prefix on ClearCachedPatches. Returns true on cache-hit runs so the
+        /// prefix skips the entire method body,
         /// preventing thousands of spurious "patch operation failed" log entries
         /// from patches that were never executed (because ApplyPatches was skipped).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipClearPatches)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         public static bool ShouldSkipClearPatches()
         {
@@ -468,18 +426,16 @@ namespace FluxxField.DefLoadCache
         }
 
         /// <summary>
-        /// Called by injected IL before every ret instruction in ApplyPatches.
+        /// Called at the end of ApplyPatchesReplacement on a miss.
         /// On cache-miss runs, this stamps attribution, serializes, and writes
-        /// the cache. On cache-hit runs, the brtrue in TryLoadCached's injected
-        /// prefix jumps PAST this call directly to ret, so SaveToCache is
-        /// NOT invoked on cache-hit (no no-op check needed here).
+        /// the cache. Not invoked on cache-hit runs.
         ///
         /// The "cache file already exists, skipping save" guard IS still
         /// present as belt-and-suspenders for the edge case where TryLoadCached
         /// returned false but the cache file was created between the check and
         /// the write.
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.SaveToCache)</c>.
+        /// Called from LoadPipelineHooks.
         /// </summary>
         public static void SaveToCache(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {

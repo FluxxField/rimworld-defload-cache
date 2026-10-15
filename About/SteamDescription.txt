@@ -36,9 +36,10 @@ An SSD and 16 GB+ RAM help. On a slow disk, reading and writing the cache takes 
 
 [h2]Requirements[/h2]
 [list]
-[*] RimWorld 1.7: [url=https://steamcommunity.com/workshop/filedetails/?id=2009463077]Harmony[/url]. Prepatcher is not needed on 1.7.
-[*] RimWorld 1.6: [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2934420800]Prepatcher[/url]
-[*] Place anywhere in your mod list after Harmony / Prepatcher.
+[*] RimWorld 1.6 or 1.7
+[*] [url=https://steamcommunity.com/workshop/filedetails/?id=2009463077]Harmony[/url]
+[*] Place anywhere in your mod list after Harmony.
+[*] Prepatcher is no longer needed as of 1.3.0. You can remove it if no other mod you use needs it.
 [/list]
 
 [h2]Compatibility[/h2]
@@ -76,8 +77,8 @@ If you are reporting a bug to another mod's author, reproduce it with "Test with
 
 [h2]Credits[/h2]
 [list]
-[*] [b]Harmony[/b] by Brrainz: the patching library DefLoadCache uses on 1.7.
-[*] [b]Prepatcher[/b] by Zetrith: the [FreePatch] IL injection DefLoadCache uses on 1.6. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
+[*] [b]Harmony[/b] by Brrainz: the patching library DefLoadCache hooks loading with.
+[*] [b]Prepatcher[/b] by Zetrith: its [FreePatch] IL injection powered versions before 1.3.0. Thanks to Jikulopo for maintaining a fork while Zetrith was away.
 [*] [b][url=https://github.com/CriDos/rimworld-defload-cache]CriDos[/url][/b]: per-file fingerprinting, streaming hash, and skipping the patch error check on cached launches.
-[*] [url=https://github.com/krafs/Publicizer]Krafs.Publicizer[/url] and [url=https://github.com/bbradson/Performance-Fish]Performance Fish[/url] by bbradson: the 1.6 build setup.
+[*] [url=https://github.com/krafs/Publicizer]Krafs.Publicizer[/url] and [url=https://github.com/bbradson/Performance-Fish]Performance Fish[/url] by bbradson: the build setup for versions before 1.3.0.
 [/list]

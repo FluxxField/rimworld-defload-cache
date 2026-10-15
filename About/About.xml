@@ -32,8 +32,7 @@ Any launch that has to build the cache runs at normal speed, or slightly slower,
 The next launch with the same mod list uses the cache. The main menu shows whether the last launch used it.
 
 COMPATIBILITY
-- RimWorld 1.7: requires Harmony.
-- RimWorld 1.6: requires Prepatcher.
+- RimWorld 1.6 and 1.7. Requires Harmony. (Prepatcher is no longer needed as of 1.3.0.)
 - Works alongside texture/asset loading mods (such as Faster Game Loading) and runtime performance mods; they speed up different parts of the game.
 - MissileGirl: turn off its XML cache (Gagarin) first. Both mods cache the same loading step.
 - Not compatible with Visual XML Patches (by Mlie): on cached launches patches aren't applied, so it has nothing to show. Disable DefLoadCache while you use it, or use "Test without cache" for one launch.
@@ -43,24 +42,14 @@ KNOWN LIMITATIONS
 - Mods that generate or change def XML from code during loading, instead of through normal Defs and Patches files, may not be reflected in the cache.
 - Only XML loading and patching are cached. Textures, sounds and def processing still load every launch.
 - If you are reporting a bug to another mod's author, reproduce it with "Test without cache" first.</description>
-  <modDependenciesByVersion>
-    <v1.6>
-      <li>
-        <packageId>zetrith.prepatcher</packageId>
-        <displayName>Prepatcher</displayName>
-        <steamWorkshopUrl>steam://url/CommunityFilePage/2934420800</steamWorkshopUrl>
-      </li>
-    </v1.6>
-    <v1.7>
-      <li>
-        <packageId>brrainz.harmony</packageId>
-        <displayName>Harmony</displayName>
-        <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
-      </li>
-    </v1.7>
-  </modDependenciesByVersion>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+  </modDependencies>
   <loadAfter>
-    <li>zetrith.prepatcher</li>
     <li>brrainz.harmony</li>
   </loadAfter>
   <!-- Visual XML Patches shows patches as they apply; on cached launches

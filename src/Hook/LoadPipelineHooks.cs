@@ -7,17 +7,16 @@ using Verse;
 namespace FluxxField.DefLoadCache
 {
     /// <summary>
-    /// RimWorld 1.7 replacement for Prepatcher/IlInjector. Installs Harmony
-    /// prefixes on the four LoadedModManager pipeline methods, each calling the
-    /// same CacheHook entry point the 1.6 IL injection calls, so cache behavior
-    /// is identical across versions.
+    /// Installs Harmony prefixes on the four LoadedModManager pipeline methods,
+    /// each calling a CacheHook entry point. Used on both 1.6 and 1.7. (Before
+    /// 1.3.0 this was done with Prepatcher [FreePatch] IL injection; Prepatcher
+    /// scans every mod DLL and crashes on mods with missing soft dependencies.)
     ///
     /// Timing: LoadAllActiveMods runs CreateModClasses (which constructs
     /// DefLoadCacheMod, which calls Install) before LoadModXML, ErrorCheckPatches,
     /// ApplyPatches and ClearCachedPatches, so all four are patched before they
     /// first execute.
     ///
-    /// Mirrors IlInjector one-to-one:
     ///   LoadModXML         → skip, return empty list   (ShouldSkipLoadModXML)
     ///   ErrorCheckPatches  → skip                       (ShouldSkipErrorCheckPatches)
     ///   ApplyPatches       → body replaced              (ApplyPatchesReplacement)

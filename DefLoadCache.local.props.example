@@ -9,11 +9,10 @@
     <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed -->
     <RimWorldManaged>C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed</RimWorldManaged>
 
-    <!-- Path to Prepatcher's workshop Assemblies folder (workshop ID 2934420800) -->
-    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies -->
-    <!-- Linux:   ~/.steam/steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
-    <!-- WSL:     /mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies -->
-    <PrepatcherAssemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2934420800\Assemblies</PrepatcherAssemblies>
+    <!-- Harmony mod (workshop 2009463077) 1.6 Assemblies folder -->
+    <!-- Windows: C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077\1.6\Assemblies -->
+    <!-- Linux:   ~/.local/share/Steam/steamapps/workshop/content/294100/2009463077/1.6/Assemblies -->
+    <Harmony16Assemblies>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077\1.6\Assemblies</Harmony16Assemblies>
 
     <!-- ===== RimWorld 1.7 (dotnet build -f net10.0) ===== -->
     <!-- Game root folder (1.7 has no *_Data/Managed; DLLs sit next to RimWorld.dll) -->
