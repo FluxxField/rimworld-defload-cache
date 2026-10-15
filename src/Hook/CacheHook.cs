@@ -29,6 +29,25 @@ namespace FluxxField.DefLoadCache
         internal static string? CurrentFingerprint => _currentFingerprint;
 
         /// <summary>
+        /// Resets per-load state. A process can run the load pipeline more than
+        /// once (RimWorld's reset-and-retry after a load exception), and state
+        /// from the previous attempt must not leak into the next one.
+        /// </summary>
+        internal static void BeginLoad()
+        {
+            _currentFingerprint = null;
+            CacheHitOccurred = false;
+            LastRunWasMiss = false;
+            CheckpointUsed = false;
+            CheckpointModIndex = -1;
+            CheckpointModsReplayed = 0;
+            CheckpointTotalMods = 0;
+            CacheValidator.LastValidationPassed = null;
+            CacheValidator.LastExpectedTotal = 0;
+            CacheValidator.LastActualTotal = 0;
+        }
+
+        /// <summary>
         /// Pipeline-wide stopwatch. Starts when HookFired enters (top of
         /// ApplyPatches), reports cumulative elapsed at each subsequent stage.
         /// Gives wall-clock timing for the entire def-loading pipeline.

@@ -56,21 +56,40 @@ namespace FluxxField.DefLoadCache
             Log.Message($"Harmony: installed {prefix} on LoadedModManager.{target}");
         }
 
+        /// <summary>
+        /// Harmony patches outlive a mod-list reset: when RimWorld recovers
+        /// from a load exception it resets ModsConfig and reloads in the same
+        /// process, and DefLoadCache may no longer be in the list. Decided once
+        /// per load at LoadModXML (the first hooked step); when false, every
+        /// prefix lets vanilla run.
+        /// </summary>
+        private static bool _activeThisLoad;
+
         private static bool LoadModXMLPrefix(ref List<LoadableXmlAsset> __result)
         {
+            CacheHook.BeginLoad();
+            _activeThisLoad = DefLoadCacheMod.OwnContent != null
+                && LoadedModManager.RunningModsListForReading.Contains(DefLoadCacheMod.OwnContent);
+            if (!_activeThisLoad)
+            {
+                Log.Message("DefLoadCache is not in the active mod list for this load (mod list was reset), loading normally");
+                return true;
+            }
+
             if (!CacheHook.ShouldSkipLoadModXML()) return true;
             __result = new List<LoadableXmlAsset>();
             return false;
         }
 
-        private static bool ErrorCheckPatchesPrefix() => !CacheHook.ShouldSkipErrorCheckPatches();
+        private static bool ErrorCheckPatchesPrefix() => !_activeThisLoad || !CacheHook.ShouldSkipErrorCheckPatches();
 
         private static bool ApplyPatchesPrefix(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
+            if (!_activeThisLoad) return true;
             CacheHook.ApplyPatchesReplacement(xmlDoc, assetlookup);
             return false;
         }
 
-        private static bool ClearCachedPatchesPrefix() => !CacheHook.ShouldSkipClearPatches();
+        private static bool ClearCachedPatchesPrefix() => !_activeThisLoad || !CacheHook.ShouldSkipClearPatches();
     }
 }
