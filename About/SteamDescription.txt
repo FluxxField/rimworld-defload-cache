@@ -47,6 +47,7 @@ Works alongside:
 [list]
 [*] Faster Game Loading, Image Opt: they speed up different loading steps (reflection, graphics, textures).
 [*] Performance Fish, HugsLib: no known conflicts.
+[*] [b]Star Ring Corporation[/b]: works as of 1.3.0. Earlier versions crashed with it through Prepatcher. Its mod list entry may still show DefLoadCache as incompatible until its authors update it.
 [*] [b]MissileGirl[/b]: compatible only with its XML cache (Gagarin) turned off. Both mods cache the same loading step, so running both caches at once will conflict. Its other features can run alongside DefLoadCache.
 [/list]
 Not compatible:
