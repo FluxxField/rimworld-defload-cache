@@ -3,10 +3,11 @@
   <name>DefLoadCache</name>
   <author>FluxxField</author>
   <packageId>fluxxfield.defloadcache</packageId>
-  <modVersion>1.2.0</modVersion>
+  <modVersion>1.3.0</modVersion>
   <url>https://github.com/FluxxField/rimworld-defload-cache</url>
   <supportedVersions>
     <li>1.6</li>
+    <li>1.7</li>
   </supportedVersions>
   <description>Dramatically reduces RimWorld launch time on repeat loads by caching the results of mod XML loading and patch application.
 
@@ -35,14 +36,23 @@ Safety:
 - One-click "Test without cache" button for isolating issues
 - Structured log output for modders reviewing player bug reports
 
-Requires Prepatcher by Zetrith.</description>
-  <modDependencies>
-    <li>
-      <packageId>zetrith.prepatcher</packageId>
-      <displayName>Prepatcher</displayName>
-      <steamWorkshopUrl>steam://url/CommunityFilePage/2934420800</steamWorkshopUrl>
-    </li>
-  </modDependencies>
+Requirements: on RimWorld 1.6, requires Prepatcher by Zetrith. On RimWorld 1.7, requires Harmony (Prepatcher is not needed).</description>
+  <modDependenciesByVersion>
+    <v1.6>
+      <li>
+        <packageId>zetrith.prepatcher</packageId>
+        <displayName>Prepatcher</displayName>
+        <steamWorkshopUrl>steam://url/CommunityFilePage/2934420800</steamWorkshopUrl>
+      </li>
+    </v1.6>
+    <v1.7>
+      <li>
+        <packageId>brrainz.harmony</packageId>
+        <displayName>Harmony</displayName>
+        <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+      </li>
+    </v1.7>
+  </modDependenciesByVersion>
   <loadAfter>
     <li>zetrith.prepatcher</li>
     <li>brrainz.harmony</li>

@@ -595,7 +595,11 @@ namespace FluxxField.DefLoadCache
         {
             try
             {
+#if RW17
+                var asset = (LoadableXmlAsset)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(LoadableXmlAsset));
+#else
                 var asset = (LoadableXmlAsset)FormatterServices.GetUninitializedObject(typeof(LoadableXmlAsset));
+#endif
                 _assetModField?.SetValue(asset, mod);
                 _assetNameField?.SetValue(asset, "cached");
                 return asset;

@@ -1,27 +1,79 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Import local paths. Copy DefLoadCache.local.props.example to
-       DefLoadCache.local.props and set your RimWorld/Prepatcher paths. -->
+       DefLoadCache.local.props and set your RimWorld/Prepatcher/Harmony paths. -->
   <Import Project="DefLoadCache.local.props" Condition="Exists('DefLoadCache.local.props')" />
 
+  <!-- One source tree, one build per RimWorld version. Build each with -f:
+         dotnet build -c Release -f net48     → 1.6/Assemblies (Unity/Mono, hooks via Prepatcher)
+         dotnet build -c Release -f net10.0   → 1.7/Assemblies (Waylith/.NET 10, hooks via Harmony)
+       Each build needs only its own version's game assemblies on disk. -->
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <RootNamespace>FluxxField.DefLoadCache</RootNamespace>
     <AssemblyName>DefLoadCache</AssemblyName>
-    <OutputPath>Assemblies\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ===== RimWorld 1.6 (Unity, Mono, Prepatcher [FreePatch] IL injection) ===== -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <OutputPath>1.6\Assemblies\</OutputPath>
+    <DefineConstants>$(DefineConstants);RW16</DefineConstants>
 
     <!-- Default paths if no local.props file exists (WSL with standard Steam install) -->
     <RimWorldManaged Condition="'$(RimWorldManaged)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin64_Data/Managed</RimWorldManaged>
     <PrepatcherAssemblies Condition="'$(PrepatcherAssemblies)' == ''">/mnt/c/Program Files (x86)/Steam/steamapps/workshop/content/294100/2934420800/Assemblies</PrepatcherAssemblies>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- ===== RimWorld 1.7 (Waylith, .NET 10, plain Harmony prefixes) ===== -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <OutputPath>1.7\Assemblies\</OutputPath>
+    <DefineConstants>$(DefineConstants);RW17</DefineConstants>
+
+    <!-- Default paths if no local.props file exists (Linux native Steam install).
+         1.7 ships its assemblies at the game root; there is no *_Data/Managed. -->
+    <RimWorld17Dir Condition="'$(RimWorld17Dir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/RimWorld</RimWorld17Dir>
+    <!-- Harmony mod (workshop 2009463077) 1.7 folder: Harmony 3.x built for .NET 10 -->
+    <Harmony17Assemblies Condition="'$(Harmony17Assemblies)' == ''">$(HOME)/.local/share/Steam/steamapps/workshop/content/294100/2009463077/1.7/Assemblies</Harmony17Assemblies>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <!-- UnityStubs.dll provides the UnityEngine types (Rect, GUI, Vector2...)
+         that 1.6-era code compiles against; Waylith.dll backs them. -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorld17Dir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityStubs">
+      <HintPath>$(RimWorld17Dir)/UnityStubs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Waylith">
+      <HintPath>$(RimWorld17Dir)/Waylith.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Harmony17Assemblies)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Prepatcher-only sources: no Prepatcher on 1.7 -->
+    <Compile Remove="src/Prepatcher/**" />
+    <Compile Remove="src/Diagnostics/IlDumper.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <!-- Harmony-based load hooks are the 1.7 replacement for IlInjector -->
+    <Compile Remove="src/Hook/LoadPipelineHooks.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <!-- RimWorld game assemblies -->
     <Reference Include="Assembly-CSharp">
       <HintPath>$(RimWorldManaged)/Assembly-CSharp.dll</HintPath>
@@ -61,7 +113,7 @@
     <PackageReference Include="Krafs.Publicizer" Version="2.*" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <!-- Publicize 0Harmony's internal types so we can use Mono.Cecil.ModuleDefinition
          etc. directly from our FreePatch method. -->
     <Publicize Include="0Harmony" IncludeVirtualMembers="false" />

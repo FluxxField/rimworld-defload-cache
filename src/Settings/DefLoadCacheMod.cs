@@ -13,6 +13,11 @@ namespace FluxxField.DefLoadCache
         public DefLoadCacheMod(ModContentPack content) : base(content)
         {
             Settings = GetSettings<DefLoadCacheSettings>();
+#if RW17
+            // 1.7 has no Prepatcher; hook the load pipeline with Harmony. Mod
+            // constructors run before LoadModXML, so this lands in time.
+            LoadPipelineHooks.Install();
+#endif
         }
 
         public override string SettingsCategory() => "DefLoadCache";
