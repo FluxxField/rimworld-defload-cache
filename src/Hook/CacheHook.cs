@@ -383,6 +383,8 @@ namespace FluxxField.DefLoadCache
                 // Validate node counts against baseline in meta.json
                 CacheValidator.Validate(_currentFingerprint!, actualCountsByMod);
 
+                MarkPatchModsAsLoaded();
+
                 sw.Stop();
                 Log.Message($"Cache HIT, loaded {rebuilt} defs from cache in {sw.ElapsedMilliseconds}ms");
 
@@ -609,6 +611,51 @@ namespace FluxxField.DefLoadCache
                 Log.Error($"CreateSyntheticAsset failed for {mod.PackageId}", ex);
                 return null;
             }
+        }
+
+        private static readonly FieldInfo? _loadedAnyPatchesField =
+            typeof(ModContentPack).GetField("loadedAnyPatches", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        /// <summary>
+        /// On a cache hit nothing reads ModContentPack.Patches, so vanilla's
+        /// loadedAnyPatches flag stays false. Patch-only mods then fail
+        /// AnyContentLoaded() and RimWorld logs a false "did not load any
+        /// content" error. Their patches ARE in the cached doc, so set the flag
+        /// for any mod with patch XML in its load folders. Checks file existence
+        /// only; parsing the patches would undo the skip.
+        /// </summary>
+        private static void MarkPatchModsAsLoaded()
+        {
+            if (_loadedAnyPatchesField == null)
+            {
+                Log.Warning("loadedAnyPatches field not found, patch-only mods may log 'did not load any content'");
+                return;
+            }
+
+            int marked = 0;
+            foreach (var mod in LoadedModManager.RunningModsListForReading)
+            {
+                try
+                {
+                    if (mod?.foldersToLoadDescendingOrder == null) continue;
+                    foreach (var folder in mod.foldersToLoadDescendingOrder)
+                    {
+                        string patchesDir = System.IO.Path.Combine(folder, "Patches");
+                        if (System.IO.Directory.Exists(patchesDir)
+                            && System.IO.Directory.EnumerateFiles(patchesDir, "*.xml", System.IO.SearchOption.AllDirectories).GetEnumerator().MoveNext())
+                        {
+                            _loadedAnyPatchesField.SetValue(mod, true);
+                            marked++;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"MarkPatchModsAsLoaded: skipped {mod?.PackageId}: {ex.Message}");
+                }
+            }
+            Log.Message($"Marked {marked} mods with patch files as loaded");
         }
 
         /// <summary>
