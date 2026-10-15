@@ -35,6 +35,8 @@ COMPATIBILITY
 - RimWorld 1.7: requires Harmony.
 - RimWorld 1.6: requires Prepatcher.
 - Works alongside texture/asset loading mods (such as Faster Game Loading) and runtime performance mods; they speed up different parts of the game.
+- MissileGirl: turn off its XML cache (Gagarin) first. Both mods cache the same loading step.
+- Not compatible with Visual XML Patches: on cached launches patches aren't applied, so it has nothing to show. Use "Test without cache" for a launch when you need it.
 
 KNOWN LIMITATIONS
 - Mod settings are not tracked. If another mod's settings turn its XML patches on or off, use "Clear all cached data" in DefLoadCache's settings after changing them.

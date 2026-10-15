@@ -46,10 +46,10 @@ Works alongside:
 [list]
 [*] Faster Game Loading, Image Opt: they speed up different loading steps (reflection, graphics, textures).
 [*] Performance Fish, HugsLib: no known conflicts.
+[*] [b]MissileGirl[/b]: compatible only with its XML cache (Gagarin) turned off. Both mods cache the same loading step, so running both caches at once will conflict. Its other features can run alongside DefLoadCache.
 [/list]
 Not compatible:
 [list]
-[*] [b]MissileGirl[/b]: its Gagarin module also caches XML loading and can't be turned off. Use one or the other.
 [*] [b]Visual XML Patches[/b]: it shows patches as they are applied. On cached launches patches aren't applied, so it has nothing to show. Use "Test without cache (next launch only)" for a launch when you need it.
 [/list]
 
