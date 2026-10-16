@@ -68,51 +68,8 @@ namespace FluxxField.DefLoadCache
                     AppendHashText(sha, fragment);
                 }
 
-                // Experimental: include mod settings config files in fingerprint
-                // so that changing a mod setting that affects XML patching
-                // (e.g., VEF toggles) invalidates the cache automatically.
-                // TODO: mod settings fingerprinting disabled for now.
-                // RimWorld writes all mod config files on every exit, which
-                // updates their mtime and invalidates the cache every launch.
-                // Need to hash file content instead of mtime to make this work.
-                // if (DefLoadCacheSettings.ExperimentalEnabled)
-                // {
-                //     AppendHashText(sha, AppendConfigFolderStats());
-                // }
-
                 return FinalizeHashToHex(sha);
             }
-        }
-
-        /// <summary>
-        /// Computes individual SHA256 hashes for each mod's fingerprint fragment.
-        /// Returns a list of (packageId, hash) pairs in load order. Used by the
-        /// checkpoint system to find where the mod list diverges from the cache.
-        /// Only called when the experimental perModHashing flag is enabled.
-        /// </summary>
-        internal static List<(string packageId, string hash)> ComputePerModHashes()
-        {
-            var result = new List<(string, string)>();
-            var mods = LoadedModManager.RunningModsListForReading;
-            if (mods == null) return result;
-
-            var fragments = new string[mods.Count];
-            Parallel.For(0, mods.Count, i =>
-            {
-                fragments[i] = BuildModFragment(mods[i]);
-            });
-
-            for (int i = 0; i < mods.Count; i++)
-            {
-                using (var sha = SHA256.Create())
-                {
-                    AppendHashText(sha, fragments[i]);
-                    string hash = FinalizeHashToHex(sha);
-                    result.Add((mods[i].PackageId ?? "<no-id>", hash));
-                }
-            }
-
-            return result;
         }
 
         private static string BuildModFragment(ModContentPack mod)
@@ -134,17 +91,14 @@ namespace FluxxField.DefLoadCache
                     string folderLabel = RelativeLabel(mod.RootDir, folder);
                     AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
                     AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
-                    // Assemblies: DLL changes can introduce new PatchOperation
-                    // subclasses or runtime-generated defs. RimWorld loads
-                    // Assemblies/ from every load folder (e.g. "1.7/Assemblies"),
-                    // not just the mod root.
-                    AppendPerFileStats(sb, folderLabel + "/assemblies", Path.Combine(folder, "Assemblies"), "*.dll");
                 }
             }
-            else
-            {
-                AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
-            }
+
+            // Assemblies: DLL changes can introduce new PatchOperation
+            // subclasses or runtime-generated defs. Walk root Assemblies/
+            // since that's where RimWorld loads them from regardless of
+            // LoadFolders.xml.
+            AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
 
             return sb.ToString();
         }
@@ -251,51 +205,6 @@ namespace FluxxField.DefLoadCache
             catch
             {
                 return new List<FileInfo>();
-            }
-        }
-
-        /// <summary>
-        /// Builds a fingerprint fragment for the Config/ folder. Includes the
-        /// mtime of every Mod_*.xml file so that any settings change invalidates
-        /// the cache. Returns the fragment as a string to feed into the hash.
-        /// </summary>
-        private static string AppendConfigFolderStats()
-        {
-            try
-            {
-                string configDir = Path.Combine(GenFilePaths.SaveDataFolderPath, "Config");
-                var sb = new StringBuilder();
-                sb.Append("config=");
-
-                if (!Directory.Exists(configDir))
-                {
-                    sb.Append("<none>\n");
-                    return sb.ToString();
-                }
-
-                // Only include Mod_*.xml files, not KeyPrefs, ModsConfig, etc.
-                var files = new List<FileInfo>();
-                foreach (var fi in new DirectoryInfo(configDir).EnumerateFiles("Mod_*.xml"))
-                {
-                    files.Add(fi);
-                }
-                files.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
-
-                foreach (var fi in files)
-                {
-                    try
-                    {
-                        sb.Append(fi.Name).Append(',')
-                          .Append(fi.LastWriteTimeUtc.Ticks).Append('\n');
-                    }
-                    catch { }
-                }
-
-                return sb.ToString();
-            }
-            catch
-            {
-                return "config=<error>\n";
             }
         }
 

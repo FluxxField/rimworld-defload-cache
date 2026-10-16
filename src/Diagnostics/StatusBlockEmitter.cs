@@ -1,5 +1,4 @@
 using System;
-using RimWorld;
 using Verse;
 
 namespace FluxxField.DefLoadCache
@@ -87,14 +86,7 @@ namespace FluxxField.DefLoadCache
             }
             else if (CacheHook.LastRunWasMiss)
             {
-                if (CacheHook.CheckpointUsed)
-                {
-                    result = $"INCREMENTAL REBUILD (checkpoint at mod {CacheHook.CheckpointModIndex}, replayed {CacheHook.CheckpointModsReplayed} of {CacheHook.CheckpointTotalMods} mods)";
-                }
-                else
-                {
-                    result = "Cache MISS (full load)";
-                }
+                result = "Cache MISS (full load)";
                 defsLine = "Defs loaded: full pipeline ran";
                 validationLine = "Validation:  N/A, no cache used";
             }
@@ -128,33 +120,6 @@ namespace FluxxField.DefLoadCache
             Log.Message("  Mod Settings → DefLoadCache → \"Test without");
             Log.Message("  cache (next launch only)\", then restart.");
             Log.Message(Border);
-
-            // Show in-game notification so users know what happened
-            try
-            {
-                if (CacheHook.CacheHitOccurred)
-                {
-                    Messages.Message(
-                        "DefLoadCache: Loaded from cache. Your launch was faster thanks to cached data.",
-                        MessageTypeDefOf.SilentInput, false);
-                }
-                else if (CacheHook.LastRunWasMiss)
-                {
-                    if (CacheHook.CheckpointUsed)
-                    {
-                        Messages.Message(
-                            $"DefLoadCache: Incremental rebuild. Replayed {CacheHook.CheckpointModsReplayed} of {CacheHook.CheckpointTotalMods} mods from checkpoint.",
-                            MessageTypeDefOf.TaskCompletion, false);
-                    }
-                    else
-                    {
-                        Messages.Message(
-                            "DefLoadCache: Cache built for the first time. Your next launch will be faster.",
-                            MessageTypeDefOf.TaskCompletion, false);
-                    }
-                }
-            }
-            catch { }
         }
     }
 }

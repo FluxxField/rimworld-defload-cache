@@ -8,30 +8,18 @@ namespace FluxxField.DefLoadCache
     internal class DefLoadCacheMod : Mod
     {
         public static DefLoadCacheSettings Settings { get; private set; } = null!;
-        /// <summary>This mod's content pack, to tell whether it is still in the running mod list.</summary>
-        internal static ModContentPack? OwnContent { get; private set; }
-        private Vector2 _scrollPosition;
 
         public DefLoadCacheMod(ModContentPack content) : base(content)
         {
             Settings = GetSettings<DefLoadCacheSettings>();
-            OwnContent = content;
-            // Hook the load pipeline with Harmony. Mod constructors run
-            // before LoadModXML, so the patches land in time.
-            LoadPipelineHooks.Install();
         }
 
         public override string SettingsCategory() => "DefLoadCache";
 
         public override void DoSettingsWindowContents(UnityEngine.Rect inRect)
         {
-            // Scrollable settings content. The view rect is taller than the
-            // window to accommodate all sections including experimental features.
-            var viewRect = new Rect(0, 0, inRect.width - 16f, 900f);
-            Widgets.BeginScrollView(inRect, ref _scrollPosition, viewRect);
-
             var listing = new Listing_Standard();
-            listing.Begin(viewRect);
+            listing.Begin(inRect);
 
             // --- Master toggle ---
             listing.CheckboxLabeled(
@@ -186,51 +174,7 @@ namespace FluxxField.DefLoadCache
                 "Files are saved in the cache folder as diagnostic-cache-hit.txt " +
                 "and diagnostic-cache-miss.txt.");
 
-            if (DefLoadCacheSettings.ExperimentalEnabled)
-            {
-                listing.Gap();
-                listing.GapLine();
-                listing.Gap();
-
-                listing.Label("Experimental Features",
-                    tooltip: "These features are under active development and may not be stable. " +
-                    "Use at your own risk.");
-                listing.Gap(4f);
-
-                listing.CheckboxLabeled(
-                    "Include mod settings in fingerprint",
-                    ref Settings.includeModSettingsInFingerprint,
-                    "Include each mod's settings file in the cache fingerprint. " +
-                    "This ensures the cache is invalidated when you change mod settings " +
-                    "that affect XML patching (e.g., VEF toggles, Tweaks Galore options).\n\n" +
-                    "Without this, changing a mod setting that affects patches requires " +
-                    "manually clearing the cache.");
-
-                listing.Gap();
-
-                listing.CheckboxLabeled(
-                    "Per-mod fingerprint hashing",
-                    ref Settings.perModHashing,
-                    "Compute and store a separate fingerprint hash for each mod instead of " +
-                    "one combined hash. This is the foundation for incremental " +
-                    "rebuild support where only changed mods trigger a partial cache rebuild.\n\n" +
-                    "No behavior change yet, just stores extra data for future use.");
-
-                listing.Gap();
-
-                listing.CheckboxLabeled(
-                    "Checkpoint-based incremental rebuild",
-                    ref Settings.checkpointEnabled,
-                    "Save snapshots of the patched document at intervals during loading. " +
-                    "When you add, remove, or update a mod, the game loads the nearest " +
-                    "valid checkpoint and replays only the remaining mods instead of " +
-                    "rebuilding everything from scratch.\n\n" +
-                    "Uses ~100MB of disk space for checkpoints on large modlists. " +
-                    "Dramatically reduces rebuild time when tweaking your mod list.");
-            }
-
             listing.End();
-            Widgets.EndScrollView();
         }
     }
 }
