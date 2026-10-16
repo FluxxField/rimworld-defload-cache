@@ -1,6 +1,6 @@
 # DefLoadCache
 
-A RimWorld mod that caches the result of mod XML loading and patch application, so repeat launches with the same mod list skip that work. Supports RimWorld 1.6 and 1.7.
+A RimWorld mod that caches the result of mod XML loading and patch application, so repeat launches with the same mod list skip that work. Supports RimWorld 1.6.
 
 ## The Problem
 
@@ -31,7 +31,7 @@ Measured launch-to-main-menu times. Your numbers depend on your mod list and har
 | Setup | First launch (builds cache) | Repeat launch (uses cache) | Cache size |
 |-------|----------------------------|----------------------------|------------|
 | RimWorld 1.6, 414 mods (Combat Extended milsim) | ~9:10 | ~2:40 | ~7 MB |
-| RimWorld 1.7, 177 mods | ~1:46 | ~0:55 | - |
+| RimWorld 1.7, 177 mods (1.3.0 test build; 1.7 not yet released) | ~1:46 | ~0:55 | - |
 
 ### What DefLoadCache skips on cached launches
 - `LoadModXML`, reading and parsing 10,000+ XML files from disk
@@ -45,8 +45,8 @@ Measured launch-to-main-menu times. Your numbers depend on your mod list and har
 
 ## Requirements
 
-- **RimWorld 1.6 or 1.7**
-- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077).** Prepatcher is no longer needed as of 1.3.0.
+- **RimWorld 1.6** (1.7 support will return in a later update)
+- **[Harmony](https://steamcommunity.com/workshop/filedetails/?id=2009463077).** Prepatcher is no longer needed as of 1.3.1.
 
 ## Installation
 
@@ -163,7 +163,7 @@ Each build needs only its own version's game assemblies, referenced via `HintPat
 
 - **Works alongside** [Faster Game Loading](https://steamcommunity.com/sharedfiles/filedetails/?id=3652938473), [Image Opt](https://steamcommunity.com/sharedfiles/filedetails/?id=3543873568), Performance Fish and HugsLib. They speed up other parts of loading; DefLoadCache only covers XML loading and patch application.
 - **MissileGirl** works with its own XML cache (Gagarin) turned off. Two caches over the same step conflict.
-- **Star Ring Corporation** works as of 1.3.0. Its About.xml may still list DefLoadCache as incompatible until its authors update it; that entry dates from when DefLoadCache needed Prepatcher.
+- **Star Ring Corporation** works as of 1.3.1. Its About.xml may still list DefLoadCache as incompatible until its authors update it; that entry dates from when DefLoadCache needed Prepatcher.
 - **[Visual XML Patches](https://steamcommunity.com/sharedfiles/filedetails/?id=3570531169) is not compatible.** It records patch results while patches run, and on a cached launch patches don't run, so it has nothing to show. Disable DefLoadCache (or use "Test without cache") while using it.
 
 ## Known Limitations
@@ -175,7 +175,9 @@ Each build needs only its own version's game assemblies, referenced via `HintPat
 
 ## Development Notes
 
-The repository also contains a checkpoint-based incremental rebuild (save snapshots along the load order, replay only the mods after a change). It is compiled out (`DefLoadCacheSettings.ExperimentalEnabled = false`) and not part of any release. Even when enabled, removing or reordering a mod forces a full rebuild.
+1.3.0 was pulled after users reported black main menus. Besides replacing Prepatcher, it shipped changes that had been committed after the 1.2.0 release but never released (a main menu status overlay, a rewrite of how cached patches are applied, and an experimental checkpoint-based incremental rebuild). 1.3.1 starts again from the released 1.2.0 code and adds only the Prepatcher replacement and a few small fixes. The unreleased work is kept on the `archive/unreleased-experiments-2026-04` branch.
+
+RimWorld 1.7 support (the `net10.0` target) builds from this source but has not been re-tested since 1.3.0, so 1.3.1 ships for 1.6 only.
 
 ## License
 
