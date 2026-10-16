@@ -8,10 +8,16 @@ namespace FluxxField.DefLoadCache
     internal class DefLoadCacheMod : Mod
     {
         public static DefLoadCacheSettings Settings { get; private set; } = null!;
+        /// <summary>This mod's content pack, to tell whether it is still in the running mod list.</summary>
+        internal static ModContentPack? OwnContent { get; private set; }
 
         public DefLoadCacheMod(ModContentPack content) : base(content)
         {
             Settings = GetSettings<DefLoadCacheSettings>();
+            OwnContent = content;
+            // Hook the load pipeline with Harmony. Mod constructors run
+            // before LoadModXML, so the hooks land in time.
+            LoadPipelineHooks.Install();
         }
 
         public override string SettingsCategory() => "DefLoadCache";

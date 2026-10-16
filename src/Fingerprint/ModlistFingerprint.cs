@@ -30,6 +30,14 @@ namespace FluxxField.DefLoadCache
         /// </summary>
         public const int CacheFormatVersion = 5;
 
+        /// <summary>
+        /// Identifies this exact DefLoadCache build, so installing any other
+        /// version (update or rollback) always rebuilds the cache instead of
+        /// reading one written by different code.
+        /// </summary>
+        private static readonly string BuildId =
+            typeof(ModlistFingerprint).Assembly.ManifestModule.ModuleVersionId.ToString("N");
+
         internal static string Compute()
         {
             var mods = LoadedModManager.RunningModsListForReading;
@@ -39,6 +47,7 @@ namespace FluxxField.DefLoadCache
                 {
                     AppendHashText(shaNull, "rimworld=" + VersionControl.CurrentVersionString + '\n');
                     AppendHashText(shaNull, "cacheformat=" + CacheFormatVersion + '\n');
+                    AppendHashText(shaNull, "build=" + BuildId + '\n');
                     AppendHashText(shaNull, "modcount=<null>\n");
                     return FinalizeHashToHex(shaNull);
                 }
@@ -61,6 +70,7 @@ namespace FluxxField.DefLoadCache
             {
                 AppendHashText(sha, "rimworld=" + VersionControl.CurrentVersionString + '\n');
                 AppendHashText(sha, "cacheformat=" + CacheFormatVersion + '\n');
+                AppendHashText(sha, "build=" + BuildId + '\n');
                 AppendHashText(sha, "modcount=" + mods.Count + '\n');
 
                 foreach (var fragment in fragments)
@@ -91,14 +101,17 @@ namespace FluxxField.DefLoadCache
                     string folderLabel = RelativeLabel(mod.RootDir, folder);
                     AppendPerFileStats(sb, folderLabel + "/defs", Path.Combine(folder, "Defs"), "*.xml");
                     AppendPerFileStats(sb, folderLabel + "/patches", Path.Combine(folder, "Patches"), "*.xml");
+                    // Assemblies: DLL changes can introduce new PatchOperation
+                    // subclasses or runtime-generated defs. RimWorld loads
+                    // Assemblies/ from every load folder (e.g. "1.6/Assemblies"),
+                    // not just the mod root.
+                    AppendPerFileStats(sb, folderLabel + "/assemblies", Path.Combine(folder, "Assemblies"), "*.dll");
                 }
             }
-
-            // Assemblies: DLL changes can introduce new PatchOperation
-            // subclasses or runtime-generated defs. Walk root Assemblies/
-            // since that's where RimWorld loads them from regardless of
-            // LoadFolders.xml.
-            AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            else
+            {
+                AppendPerFileStats(sb, "assemblies", Path.Combine(mod.RootDir, "Assemblies"), "*.dll");
+            }
 
             return sb.ToString();
         }

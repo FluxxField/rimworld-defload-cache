@@ -9,7 +9,10 @@ using Verse;
 namespace FluxxField.DefLoadCache
 {
     /// <summary>
-    /// Static entry points called from IL injected by IlInjector.
+    /// Static entry points called from the Harmony hooks in LoadPipelineHooks
+    /// (before 1.3.0, from IL injected by Prepatcher). Comments below that say
+    /// "injected IL" or "brtrue" describe that original IL; LoadPipelineHooks
+    /// documents the equivalent Harmony hook for each.
     ///
     /// Stage A: HookFired logs that ApplyPatches was entered.
     /// Stage B: HookFired also computes and stashes the modlist fingerprint.
@@ -31,6 +34,21 @@ namespace FluxxField.DefLoadCache
         internal static string? CurrentFingerprint => _currentFingerprint;
 
         /// <summary>
+        /// Resets per-load state. A process can run the load pipeline more than
+        /// once (RimWorld's reset-and-retry after a load exception), and state
+        /// from the previous attempt must not leak into the next one.
+        /// </summary>
+        internal static void BeginLoad()
+        {
+            _currentFingerprint = null;
+            CacheHitOccurred = false;
+            LastRunWasMiss = false;
+            CacheValidator.LastValidationPassed = null;
+            CacheValidator.LastExpectedTotal = 0;
+            CacheValidator.LastActualTotal = 0;
+        }
+
+        /// <summary>
         /// Pipeline-wide stopwatch. Starts when HookFired enters (top of
         /// ApplyPatches), reports cumulative elapsed at each subsequent stage.
         /// Gives wall-clock timing for the entire def-loading pipeline.
@@ -44,7 +62,6 @@ namespace FluxxField.DefLoadCache
         /// returns an empty List, so LoadModXML + CombineIntoUnifiedXML are
         /// effectively no-ops. The cached doc is loaded later in TryLoadCached.
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipLoadModXML)</c>.
         /// </summary>
         public static bool ShouldSkipLoadModXML()
         {
@@ -96,7 +113,6 @@ namespace FluxxField.DefLoadCache
         /// fingerprint is already computed, so it just logs entry. On Stage G miss,
         /// computes the fingerprint here (same as before Stage G existed).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.HookFired)</c>.
         /// </summary>
         public static void HookFired()
         {
@@ -137,7 +153,6 @@ namespace FluxxField.DefLoadCache
         /// assetlookup (LoadableXmlAsset's fields are readonly so we can't
         /// construct synthetic instances).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.TryLoadCached)</c>.
         /// </summary>
         public static bool TryLoadCached(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
@@ -251,6 +266,8 @@ namespace FluxxField.DefLoadCache
                 // Validate node counts against baseline in meta.json
                 CacheValidator.Validate(_currentFingerprint!, actualCountsByMod);
 
+                MarkPatchModsAsLoaded();
+
                 sw.Stop();
                 Log.Message($"Cache HIT, loaded {rebuilt} defs from cache in {sw.ElapsedMilliseconds}ms");
 
@@ -271,7 +288,6 @@ namespace FluxxField.DefLoadCache
         ///
         /// Based on work by CriDos (https://github.com/CriDos/rimworld-defload-cache).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipErrorCheckPatches)</c>.
         /// </summary>
         public static bool ShouldSkipErrorCheckPatches()
         {
@@ -312,7 +328,6 @@ namespace FluxxField.DefLoadCache
         /// preventing thousands of spurious "patch operation failed" log entries
         /// from patches that were never executed (because ApplyPatches was skipped).
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.ShouldSkipClearPatches)</c>.
         /// </summary>
         public static bool ShouldSkipClearPatches()
         {
@@ -345,7 +360,6 @@ namespace FluxxField.DefLoadCache
         /// returned false but the cache file was created between the check and
         /// the write.
         ///
-        /// IMPORTANT: IlInjector resolves this by <c>nameof(CacheHook.SaveToCache)</c>.
         /// </summary>
         public static void SaveToCache(XmlDocument xmlDoc, Dictionary<XmlNode, LoadableXmlAsset> assetlookup)
         {
@@ -431,6 +445,51 @@ namespace FluxxField.DefLoadCache
         private static readonly FieldInfo? _assetNameField =
             typeof(LoadableXmlAsset).GetField("name", BindingFlags.Public | BindingFlags.Instance);
 
+        private static readonly FieldInfo? _loadedAnyPatchesField =
+            typeof(ModContentPack).GetField("loadedAnyPatches", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        /// <summary>
+        /// On a cache hit nothing reads ModContentPack.Patches, so vanilla's
+        /// loadedAnyPatches flag stays false. Patch-only mods then fail
+        /// AnyContentLoaded() and RimWorld logs a false "did not load any
+        /// content" error. Their patches ARE in the cached doc, so set the flag
+        /// for any mod with patch XML in its load folders. Checks file existence
+        /// only; parsing the patches would undo the skip.
+        /// </summary>
+        private static void MarkPatchModsAsLoaded()
+        {
+            if (_loadedAnyPatchesField == null)
+            {
+                Log.Warning("loadedAnyPatches field not found, patch-only mods may log 'did not load any content'");
+                return;
+            }
+
+            int marked = 0;
+            foreach (var mod in LoadedModManager.RunningModsListForReading)
+            {
+                try
+                {
+                    if (mod?.foldersToLoadDescendingOrder == null) continue;
+                    foreach (var folder in mod.foldersToLoadDescendingOrder)
+                    {
+                        string patchesDir = System.IO.Path.Combine(folder, "Patches");
+                        if (System.IO.Directory.Exists(patchesDir)
+                            && System.IO.Directory.EnumerateFiles(patchesDir, "*.xml", System.IO.SearchOption.AllDirectories).GetEnumerator().MoveNext())
+                        {
+                            _loadedAnyPatchesField.SetValue(mod, true);
+                            marked++;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"MarkPatchModsAsLoaded: skipped {mod?.PackageId}: {ex.Message}");
+                }
+            }
+            Log.Message($"Marked {marked} mods with patch files as loaded");
+        }
+
         /// <summary>
         /// Creates a minimal LoadableXmlAsset with only the mod and name fields
         /// set. Uses FormatterServices.GetUninitializedObject to bypass the
@@ -441,7 +500,11 @@ namespace FluxxField.DefLoadCache
         {
             try
             {
+#if RW17
+                var asset = (LoadableXmlAsset)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(LoadableXmlAsset));
+#else
                 var asset = (LoadableXmlAsset)FormatterServices.GetUninitializedObject(typeof(LoadableXmlAsset));
+#endif
                 _assetModField?.SetValue(asset, mod);
                 _assetNameField?.SetValue(asset, "cached");
                 return asset;
